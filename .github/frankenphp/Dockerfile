@@ -21,3 +21,5 @@ RUN install-php-extensions \
         opcache \
         bcmath \
         sodium
+
+RUN mkdir -p /data /config && chmod 777 /data /config

@@ -21,7 +21,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Webmozart\Assert\Assert;
 
-final class ProductVariantOptionValuesConfigurationValidator extends ConstraintValidator {
+final class ProductVariantOptionValuesConfigurationValidator extends ConstraintValidator
+{
     public function validate(mixed $value, Constraint $constraint): void
     {
         /** @var ProductVariantInterface $value */

@@ -34,7 +34,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Webmozart\Assert\Assert;
 
-class UserController extends ResourceController {
+class UserController extends ResourceController
+{
     public function changePasswordAction(Request $request): Response
     {
         $configuration = $this->requestConfigurationFactory->create($this->metadata, $request);

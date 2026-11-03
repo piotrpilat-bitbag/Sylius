@@ -23,7 +23,8 @@ use Symfony\Component\HttpFoundation\Session\Flash\FlashBagInterface;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Webmozart\Assert\Assert;
 
-final class ZoneMemberIntegrityListener {
+final class ZoneMemberIntegrityListener
+{
     public function __construct(
         private RequestStack $requestStack,
         private ZoneDeletionCheckerInterface $zoneDeletionChecker,
@@ -70,5 +71,4 @@ final class ZoneMemberIntegrityListener {
     {
         return $this->requestStack->getSession();
     }
-
 }

@@ -20,7 +20,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
-final class ResendShipmentConfirmationEmailWithValidShipmentStateValidator extends ConstraintValidator {
+final class ResendShipmentConfirmationEmailWithValidShipmentStateValidator extends ConstraintValidator
+{
     /** @param RepositoryInterface<ShipmentInterface> $shipmentRepository */
     public function __construct(private RepositoryInterface $shipmentRepository)
     {
