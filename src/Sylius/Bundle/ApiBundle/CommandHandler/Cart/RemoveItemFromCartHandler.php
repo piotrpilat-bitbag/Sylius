@@ -51,8 +51,8 @@ final readonly class RemoveItemFromCartHandler implements ResetInterface
 
         return $cart;
     }
-    public function reset(): void {
-        $this->orderItemRepository = null;
-        $this->orderModifier = null;
+
+    public function reset(): void
+    {
     }
 }

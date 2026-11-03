@@ -19,7 +19,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Webmozart\Assert\Assert;
 
-final class ProductImageVariantsBelongToOwnerValidator extends ConstraintValidator {
+final class ProductImageVariantsBelongToOwnerValidator extends ConstraintValidator
+{
     public function validate(mixed $value, Constraint $constraint): void
     {
         Assert::isInstanceOf($value, ProductImageInterface::class);

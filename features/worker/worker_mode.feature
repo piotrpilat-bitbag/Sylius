@@ -209,7 +209,7 @@ Feature: Request isolation in worker mode
         Then every request succeeded
 
     Scenario: A checkout, then a new visitor on the same channel
-        When I complete the checkout on channel "A"
+        When visitor "A" places an order on channel "A"
         And a new visitor arrives
         And I visit "/" on channel "A"
         Then every request succeeded

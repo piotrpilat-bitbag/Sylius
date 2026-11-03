@@ -637,6 +637,14 @@ final class WorkerModeContext implements Context
         );
     }
 
+    #[When('visitor :name places an order on channel :channel')]
+    public function visitorPlacesAnOrder(string $name, string $channel): void
+    {
+        $this->useVisitor($name);
+        $this->visitorRegisters($name, $channel);
+        $this->iCompleteTheCheckout($channel);
+    }
+
     // --------------------------------------------------- the back office --
 
     #[When('I log into the admin panel')]

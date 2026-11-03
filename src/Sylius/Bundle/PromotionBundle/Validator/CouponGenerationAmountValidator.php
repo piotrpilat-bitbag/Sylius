@@ -20,7 +20,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Webmozart\Assert\Assert;
 
-final class CouponGenerationAmountValidator extends ConstraintValidator {
+final class CouponGenerationAmountValidator extends ConstraintValidator
+{
     public function __construct(private GenerationPolicyInterface $generationPolicy)
     {
     }
@@ -48,5 +49,4 @@ final class CouponGenerationAmountValidator extends ConstraintValidator {
             );
         }
     }
-
 }

@@ -204,6 +204,7 @@ jobs:
                         -e APP_RUNTIME='Runtime\FrankenPhpSymfony\Runtime' \
                         -e APP_ENV="$APP_ENV" -e APP_DEBUG=0 \
                         -e DATABASE_URL="$DATABASE_URL" \
+                        -e PHP_MEMORY_LIMIT=512M \
                         -e SERVER_NAME="http://localhost:8080 http://channel-a.localhost:8080 http://channel-b.localhost:8080" \
                         sylius-worker-runtime:ci
 

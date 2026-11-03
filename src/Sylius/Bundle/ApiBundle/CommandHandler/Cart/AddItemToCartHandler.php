@@ -28,10 +28,9 @@ use Sylius\Component\Order\Modifier\OrderItemQuantityModifierInterface;
 use Sylius\Component\Order\Modifier\OrderModifierInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Contracts\Service\ResetInterface;
 
 #[AsMessageHandler]
-final readonly class AddItemToCartHandler implements ResetInterface
+final readonly class AddItemToCartHandler
 {
     /**
      * @param OrderRepositoryInterface<OrderInterface> $orderRepository
@@ -101,13 +100,5 @@ final readonly class AddItemToCartHandler implements ResetInterface
         }
 
         throw new NotFoundHttpException('Cart not found.');
-    }
-    public function reset(): void {
-        $this->orderRepository = null;
-        $this->productVariantRepository = null;
-        $this->orderModifier = null;
-        $this->cartItemFactory = null;
-        $this->orderItemQuantityModifier = null;
-        $this->userContext = null;
     }
 }

@@ -120,14 +120,7 @@ final class AddPaymentRequestHandler implements ResetInterface
             null === $customer->getUser() ||
             $order->isCreatedByGuest();
     }
-    public function reset(): void {
-        $this->paymentMethodRepository = null;
-        $this->paymentRepository = null;
-        $this->paymentRequestFactory = null;
-        $this->paymentRequestRepository = null;
-        $this->defaultActionProvider = null;
-        $this->defaultPayloadProvider = null;
-        $this->userContext = null;
-        $this->paymentMethodsResolver = null;
+    public function reset(): void
+    {
     }
 }

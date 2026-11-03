@@ -20,7 +20,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Webmozart\Assert\Assert;
 
-final class OrderPaymentMethodEligibilityValidator extends ConstraintValidator {
+final class OrderPaymentMethodEligibilityValidator extends ConstraintValidator
+{
     /**
      * @throws \InvalidArgumentException
      */

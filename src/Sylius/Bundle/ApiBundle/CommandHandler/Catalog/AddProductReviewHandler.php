@@ -73,10 +73,8 @@ final readonly class AddProductReviewHandler implements ResetInterface
 
         return $review;
     }
-    public function reset(): void {
-        $this->productReviewFactory = null;
-        $this->productReviewRepository = null;
-        $this->productRepository = null;
-        $this->customerResolver = null;
+
+    public function reset(): void
+    {
     }
 }

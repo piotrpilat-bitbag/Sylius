@@ -21,7 +21,8 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Webmozart\Assert\Assert;
 
-final class ProductVariantCombinationValidator extends ConstraintValidator {
+final class ProductVariantCombinationValidator extends ConstraintValidator
+{
     public function __construct(private ProductVariantsParityCheckerInterface $variantsParityChecker)
     {
     }

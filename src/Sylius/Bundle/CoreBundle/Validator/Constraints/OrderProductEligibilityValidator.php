@@ -18,7 +18,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Webmozart\Assert\Assert;
 
-final class OrderProductEligibilityValidator extends ConstraintValidator {
+final class OrderProductEligibilityValidator extends ConstraintValidator
+{
     /**
      * @throws \InvalidArgumentException
      */
@@ -52,5 +53,4 @@ final class OrderProductEligibilityValidator extends ConstraintValidator {
             }
         }
     }
-
 }

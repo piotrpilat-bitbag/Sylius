@@ -18,7 +18,8 @@ use Sylius\Component\Order\Modifier\OrderModifierInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Webmozart\Assert\Assert;
 
-final readonly class CartItemAddListener {
+final readonly class CartItemAddListener
+{
     public function __construct(private OrderModifierInterface $orderModifier)
     {
     }
