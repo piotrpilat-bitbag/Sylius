@@ -12,13 +12,14 @@ Feature: Request isolation in worker mode
     There is no Given step for it on purpose: the setup has to happen before the
     process under test comes up.
 
-    Scenario: A channel renders its own name, whichever one was served first
-        When I browse "/" alternating between both channels 2 times
-        Then channel "A" renders its own name
-        And channel "B" renders its own name
-
     Scenario: Adding a product to the cart works at all
         When I add the first product to the cart on channel "A"
+        Then every request succeeded
+
+    Scenario: A checkout, then a new visitor on the same channel
+        When visitor "A" places an order on channel "A"
+        And a new visitor arrives
+        And I visit "/" on channel "A"
         Then every request succeeded
 
     Scenario: Two customers browsing alternately each see their own profile
@@ -208,8 +209,7 @@ Feature: Request isolation in worker mode
         And I browse my account on channel "A"
         Then every request succeeded
 
-    Scenario: A checkout, then a new visitor on the same channel
-        When visitor "A" places an order on channel "A"
-        And a new visitor arrives
-        And I visit "/" on channel "A"
-        Then every request succeeded
+    Scenario: A channel renders its own name, whichever one was served first
+        When I browse "/" alternating between both channels 2 times
+        Then channel "A" renders its own name
+        And channel "B" renders its own name

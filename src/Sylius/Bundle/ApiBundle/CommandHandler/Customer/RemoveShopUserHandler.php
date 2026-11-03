@@ -45,5 +45,8 @@ final readonly class RemoveShopUserHandler implements ResetInterface
 
     public function reset(): void
     {
+        if ($this->shopUserRepository instanceof ResetInterface) {
+            $this->shopUserRepository->reset();
+        }
     }
 }
