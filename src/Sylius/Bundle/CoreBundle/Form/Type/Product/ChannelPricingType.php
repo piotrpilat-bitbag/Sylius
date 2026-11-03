@@ -25,7 +25,8 @@ use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-final class ChannelPricingType extends AbstractResourceType {
+final class ChannelPricingType extends AbstractResourceType
+{
     /** @param RepositoryInterface<ChannelPricingInterface>|null $channelPricingRepository */
     public function __construct(
         string $dataClass,

@@ -2,21 +2,6 @@
 
 declare(strict_types=1);
 
-/*
- * Writes the Symfony service map (var/cache/igor_service_map.json) that Igor-PHP
- * expects in its Deep Audit mode (Level 3 - Igor Agent).
- *
- * It does what IgorPhpBundle does (IgorAliasSnapshotPass before private aliases
- * are removed + IgorDiscoveryPass after unused definitions are removed), but
- * against an in-memory ContainerBuilder - so nothing is added to composer.json
- * and the on-disk container is left alone. That matters here: the FrankenPHP
- * worker in this job is serving requests out of that very cache directory.
- *
- * Without this file `igor-php --no-agent` falls back to `debug:container
- * --show-hidden`, which on Symfony 7.4/8.x returns ONLY hidden services (the
- * ones whose id starts with a dot) and therefore misses ~99% of the container.
- * The audit then looks clean because it saw almost nothing.
- */
 
 use Symfony\Component\DependencyInjection\Argument\ServiceClosureArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;

@@ -26,7 +26,8 @@ use Symfony\Component\Console\Output\OutputInterface;
     name: 'sylius:remove-expired-carts',
     description: 'Removes carts that have been idle for a period set in `sylius_order.expiration.cart` configuration key.',
 )]
-class RemoveExpiredCartsCommand extends Command {
+class RemoveExpiredCartsCommand extends Command
+{
     public function __construct(
         private ExpiredCartsRemoverInterface $expiredCartsRemover,
         private string $expirationTime,
