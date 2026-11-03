@@ -30,6 +30,24 @@ if (!\is_array($entries)) {
     exit(0);
 }
 
+// Patterns to exclude from the summary. These are still in igor.json and
+// igor.txt, but do not appear in the GitHub job summary. Useful for known
+// false positives or low-value findings that clutter the report.
+$ignorePatterns = [
+    'Mutation detected on a local reference to a shared service',
+];
+
+// Checks whether any ignore pattern matches the finding message.
+$shouldIgnore = static function (string $message, array $patterns): bool {
+    foreach ($patterns as $pattern) {
+        if (str_contains($message, $pattern)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 $buckets = [
     'project' => ['services' => 0, 'findings' => 0, 'errors' => 0, 'top' => []],
     'vendor' => ['services' => 0, 'findings' => 0, 'errors' => 0, 'top' => []],
@@ -49,6 +67,18 @@ foreach ($entries as $entry) {
     $isVendor = str_starts_with($filePath, 'vendor/') || str_contains($filePath, '/vendor/');
     $group = $isVendor ? 'vendor' : 'project';
     $findings = \is_array($entry['findings'] ?? null) ? $entry['findings'] : [];
+
+    // Filter findings: keep only those that do not match any ignore pattern.
+    $findings = array_filter($findings, static function (array $finding) use ($shouldIgnore, $ignorePatterns): bool {
+        $message = (string) ($finding['message'] ?? '');
+
+        return !$shouldIgnore($message, $ignorePatterns);
+    });
+
+    // Skip services that have no findings after filtering.
+    if (0 === \count($findings)) {
+        continue;
+    }
 
     $errors = 0;
     foreach ($findings as $finding) {

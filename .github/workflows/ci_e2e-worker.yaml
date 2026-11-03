@@ -1,10 +1,46 @@
-
+#  Request isolation in worker mode (FrankenPHP).
+#
+#  Measures one thing: whether a request sees state left behind by the previous
+#  one, when the PHP process does not die in between. Every other e2e job serves
+#  the application with a process that ends with the response, so none of them
+#  can see this at all.
+#
+#  NO MATRIX, deliberately. A carried-over field is a property of a shared
+#  service in the container, not of a PHP or Symfony version - the same services
+#  carry the same fields on every one of them. The combinatorics belong to the
+#  other e2e jobs; here they would only add time and force an entry in
+#  matrix.json. One run on a current version is enough.
+#
+#  The PHP version is one value in one place because it has to agree in two:
+#  setup-php builds the application and the FrankenPHP image serves it. When the
+#  two disagree, platform_check.php kills the application on startup.
+#
+#  What BuildTestAppAction@v4 does, read off the log of a real
+#  "Tests (MariaDB) / UI" job in Sylius/Sylius, run 41054186132:
+#
+#      sudo service mysql stop ; docker run -d <database>
+#      DATABASE_URL=… >> $GITHUB_ENV
+#      shivammathur/setup-php@v2
+#      actions/cache@v4
+#      [e2e_js] chromedriver          gated by e2e_js, NOT by e2e
+#      [e2e]    symfony server:start --port=8080 --dir=./public --daemon --no-tls
+#      doctrine:database:create / assets:install / cache:warmup
+#      sylius:fixtures:load -n
+#
+#  Two consequences for this job: port 8080 has to be freed, and the `worker`
+#  fixtures load AFTER the action, because channel B copies a catalogue that
+#  only exists once the default suite has run.
 
 name: Tests (worker mode)
 
 on:
     workflow_dispatch: ~
-    #  Temporary
+    #  Temporary, while the suite is being brought up: workflow_dispatch only
+    #  works for workflows present on the default branch, and this one is not
+    #  there yet. The `upmerge/**` branch name is chosen on purpose -
+    #  ci__minimal.yaml lists it in branches-ignore and ci__full.yaml only reacts
+    #  to full-ci/**, so a push does not fire the other twenty-odd jobs.
+    #  TO BE REMOVED before the pull request.
     push:
         branches:
             - 'upmerge/worker-mode'
@@ -20,7 +56,13 @@ permissions:
     contents: read
 
 env:
+    #  The same environment as the other e2e jobs. In `dev`,
+    #  DoctrineMetadataCacheWarmer breaks cache:clear ("must load metadata
+    #  first"), and the profiler would add per-request state of its own and
+    #  drown the signal. test_cached has APP_DEBUG=0.
     APP_ENV: test_cached
+    #  Channel A is Sylius' default fixture channel. This variable gives it a
+    #  hostname; the `default` suite reads it through %env(resolve:...)%.
     SYLIUS_FIXTURES_HOSTNAME: channel-a.localhost
     WORKER_CHANNEL_A: http://channel-a.localhost:8080
     WORKER_CHANNEL_B: http://channel-b.localhost:8080
@@ -30,6 +72,13 @@ env:
     SYMFONY_VERSION: '~7.4.0'
     FRANKENPHP_VERSION: '1.13'
     MYSQL_VERSION: '8.4'
+    IGOR_VERSION: '0.10.1'
+    #  TEMPORARY, together with the `push` trigger below: the fixes for
+    #  ResourceTranslationsType and CookieStorage live in sylius/resource-bundle,
+    #  which has not released them yet. Until it does, the branch comes from the
+    #  fork so that this suite measures the INTENDED end state rather than half
+    #  the fixes. After the release: empty this variable and the step below
+    #  skips itself.
     RESOURCE_BUNDLE_REF: 'dev-feature/1.15/OP-617 as 1.15.99'
     RESOURCE_BUNDLE_REPO: 'https://github.com/piotrpilat-bitbag/SyliusResourceBundle.git'
 
@@ -50,6 +99,8 @@ jobs:
                 if: "${{ inputs.branch == '' }}"
                 uses: actions/checkout@v4
 
+            #  Without these, cache:warmup has nothing to read and fails on the
+            #  missing manifest. The other e2e jobs do exactly the same.
             -   name: "Prepare manifest.json files"
                 run: |
                     mkdir -p public/build/admin public/build/shop
@@ -71,40 +122,43 @@ jobs:
                     php_version: ${{ env.PHP_VERSION }}
                     symfony_version: ${{ env.SYMFONY_VERSION }}
 
+            #  The action started the Symfony CLI server on 8080 (--daemon). It
+            #  has to go before FrankenPHP takes the same port.
+            #  The only addition to the system UNDER TEST rather than to the
+            #  instrument: without this runtime Symfony will not come up in
+            #  worker mode at all.
+            #
+            #  Installed AFTER the application is built, because `--no-update`
+            #  before the action only writes the constraint into composer.json
+            #  and the install that follows resolves from the lock and never
+            #  picks it up - the package misses vendor/ and the application dies
+            #  on the missing APP_RUNTIME class, returning 500 on every request.
             -   name: "Require FrankenPHP runtime"
                 run: |
                     composer require --dev --no-interaction --no-progress --no-scripts \
                         "runtime/frankenphp-symfony:^1.0"
 
-                    # Straznik: bez tego brak runtime'u objawia sie dopiero jako
-                    # 500 z dzialajacego serwera, co prowadzi sledztwo w zla strone.
+                    # Guard: without it a missing runtime shows up only as a 500
+                    # from a healthy-looking server, which sends the
+                    # investigation in the wrong direction.
                     composer show runtime/frankenphp-symfony > /dev/null || {
-                        echo "::error::runtime/frankenphp-symfony nie zainstalowany"
+                        echo "::error::runtime/frankenphp-symfony is not installed"
                         exit 1
                     }
 
                     bin/console cache:clear --no-interaction
 
-            -   name: "Resource bundle from the fork"
-                if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
-                run: |
-                    composer config repositories.resource-bundle-fork vcs "$RESOURCE_BUNDLE_REPO"
-                    composer require --no-interaction --no-progress --no-scripts \
-                        "sylius/resource-bundle:${RESOURCE_BUNDLE_REF}"
-
-                    composer show sylius/resource-bundle | head -3
-                    bin/console cache:clear --no-interaction
-
             -   name: "Stop the Symfony CLI server"
                 run: |
-                    # BuildTestAppAction startuje serwer z --dir=./public, wiec
-                    # tym samym katalogiem trzeba go zatrzymac. Z innym `--dir`
-                    # symfony melduje "The web server is not running" i konczy
-                    # sukcesem, zostawiajac proces trzymajacy port.
+                    # BuildTestAppAction starts the server with --dir=./public,
+                    # so it has to be stopped with the same directory. With any
+                    # other `--dir`, symfony reports "The web server is not
+                    # running" and exits successfully, leaving a process that
+                    # still holds the port.
                     symfony server:stop --dir="$PWD/public" || true
                     symfony server:stop --dir="$PWD" || true
 
-                    # Jesli cokolwiek nadal trzyma 8080, ubijamy po PID.
+                    # If anything still holds 8080, kill it by PID.
                     for _ in 1 2 3; do
                         ss -ltn | grep -q ':8080 ' || break
                         PID=$(ss -ltnp 2>/dev/null | grep ':8080 ' | grep -oP 'pid=\K[0-9]+' | head -1)
@@ -112,18 +166,43 @@ jobs:
                         sleep 2
                     done
 
-                    # Straznik: bez wolnego portu FrankenPHP nie wstanie, Behat
-                    # trafi na STARY serwer i cala suita zmierzy tryb classic,
-                    # swiecac na zielono.
+                    # Guard: without a free port FrankenPHP cannot bind, Behat
+                    # reaches the OLD server and the whole suite measures classic
+                    # mode while going green.
                     if ss -ltn | grep -q ':8080 '; then
-                        echo "::error::port 8080 nadal zajety"
+                        echo "::error::port 8080 is still taken"
                         ss -ltnp | grep ':8080 ' || true
                         exit 1
                     fi
 
+            #  Two channels differing in name, hostname, locale and currency.
+            #  The names do not have to resolve: HttpBrowser sets the Host
+            #  header itself, so no /etc/hosts entry is needed.
+            #  The API scenarios log in over JWT. Without a keypair
+            #  /api/v2/shop/customers/token returns 500 and the suite reports it
+            #  as a failed login.
+            -   name: "Resource bundle from the fork"
+                if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
+                run: |
+                    #  The "as 1.15.99" alias is required: sylius/sylius wants
+                    #  ^1.14.2 and a dev branch does not satisfy that on its own.
+                    composer config repositories.resource-bundle-fork vcs "$RESOURCE_BUNDLE_REPO"
+                    composer require --no-interaction --no-progress --no-scripts \
+                        "sylius/resource-bundle:${RESOURCE_BUNDLE_REF}"
+
+                    composer show sylius/resource-bundle | head -3
+                    bin/console cache:clear --no-interaction
+
+            -   name: "JWT keypair"
+                run: bin/console lexik:jwt:generate-keypair --skip-if-exists --no-interaction
+
             -   name: "Two channels"
                 run: bin/console sylius:fixtures:load worker --no-interaction
 
+            #  The stock FrankenPHP image has no pdo_mysql - the application
+            #  comes up and returns 500 "could not find driver". This adds the
+            #  extensions sylius/sylius requires. The build takes under a minute
+            #  and buildx caches it.
             -   name: "Build the FrankenPHP image"
                 uses: docker/build-push-action@v6
                 with:
@@ -148,55 +227,88 @@ jobs:
                         -e APP_RUNTIME='Runtime\FrankenPhpSymfony\Runtime' \
                         -e APP_ENV="$APP_ENV" -e APP_DEBUG=0 \
                         -e DATABASE_URL="$DATABASE_URL" \
-                        -e PHP_MEMORY_LIMIT=512M \
                         -e SERVER_NAME="http://localhost:8080 http://channel-a.localhost:8080 http://channel-b.localhost:8080" \
                         sylius-worker-runtime:ci
 
                     for i in $(seq 1 30); do
                         if curl -fsS -o /dev/null http://localhost:8080/; then
-                            echo "  worker odpowiada po ${i}s"; exit 0
+                            echo "  worker answered after ${i}s"; exit 0
                         fi
                         sleep 1
                     done
-                    echo "::error::FrankenPHP nie odpowiada 200 w 30s"
-                    echo "--- cialo odpowiedzi:"
+                    echo "::error::FrankenPHP did not answer 200 within 30s"
+                    echo "--- response body:"
                     curl -s http://localhost:8080/ | head -c 3000 || true
-                    echo "--- log aplikacji ($APP_ENV):"
+                    echo "--- application log ($APP_ENV):"
                     tail -c 20000 "var/log/${APP_ENV}.log" 2>/dev/null || ls -la var/log/ || true
                     echo "--- docker:"
                     docker logs --tail=50 franken || true
                     exit 1
 
+            #  A scenario that does not measure a worker passes green while
+            #  checking nothing. This step guards against that silence.
             -   name: "Confirm we are really in worker mode"
                 run: |
                     HDR=$(curl -fsSI http://localhost:8080/ | tr -d '\r' | awk -F': ' '/^X-Franken-Worker/{print $2}')
-                    test "$HDR" = "1" || { echo "::error::nie worker mode (X-Franken-Worker=$HDR)"; exit 1; }
+                    test "$HDR" = "1" || { echo "::error::not worker mode (X-Franken-Worker=$HDR)"; exit 1; }
 
-                    #  Caddy obsluguje wylacznie hosty wymienione w SERVER_NAME.
-                    #  Zadanie z innym naglowkiem Host dostaje 200 i ZERO bajtow
-                    #  — nie blad, tylko puste cialo. Suita widzi wtedy "brak
-                    #  formularza" i "brak linkow do produktu", wiec sledztwo
-                    #  idzie w dane zamiast w routing. Sprawdzone pomiarem.
+                    #  Caddy serves only the hosts named in SERVER_NAME. A
+                    #  request with any other Host header gets 200 and ZERO
+                    #  bytes - not an error, just an empty body. The suite then
+                    #  reports "no form" and "no product links", and the
+                    #  investigation goes into the data instead of the routing.
+                    #  Measured, not guessed.
                     for ch in a b; do
                         host="channel-${ch}.localhost:8080"
                         if [ "$ch" = "a" ]; then name="$WORKER_CHANNEL_A_NAME"; else name="$WORKER_CHANNEL_B_NAME"; fi
 
                         body=$(curl -fsSL "http://${host}/" || true)
                         if ! printf '%s' "$body" | grep -qF "$name"; then
-                            echo "::error::${host} nie renderuje kanalu \"${name}\" (odpowiedz: ${#body} bajtow)"
+                            echo "::error::${host} does not render channel \"${name}\" (response: ${#body} bytes)"
                             printf '%s' "$body" | head -c 1000
                             exit 1
                         fi
                         echo "  ${host} -> ${name}, ok"
                     done
 
+            #  A suite of its own, not an extension of @ui. Those talk to a
+            #  kernel booted inside the Behat process, and then there is no
+            #  worker left to measure.
             -   name: "Run worker-mode Behat"
                 run: |
                     vendor/bin/behat --strict --no-interaction --colors \
-                        --suite worker
+                        --suite worker --tags="~@todo"
 
             -   name: "Logs"
                 if: failure()
                 run: |
                     docker logs --tail=200 franken || true
                     tail -c 50000 "var/log/${APP_ENV}.log" 2>/dev/null || ls -la var/log/ || true
+
+            #  Static counterpart to the suite above, and ADVISORY ONLY - hence
+            #  continue-on-error. Igor reads the AST and cannot tell a mutation
+            #  of an injected dependency from an ordinary method call on it, so
+            #  on a codebase this size most of what it reports is noise. Gating
+            #  the build on it would mean a permanently red job that everyone
+            #  learns to skip, taking the few real findings with it.
+            #
+            #  It earns its place anyway: Behat only sees state that a scenario
+            #  walks into, while this covers every shared service in the
+            #  compiled container, including the ones no feature file reaches.
+            #
+            #  Last on purpose. It runs even when the suite went red (the
+            #  findings are often the explanation), but after the logs, so a
+            #  failing run still opens on the failure rather than on the audit.
+            -   name: "Igor: static audit (advisory)"
+                if: always()
+                continue-on-error: true
+                run: sh .github/igor/audit.sh
+
+            -   name: "Igor: report"
+                if: always()
+                continue-on-error: true
+                uses: actions/upload-artifact@v4
+                with:
+                    name: igor-audit
+                    path: var/igor/
+                    if-no-files-found: warn
