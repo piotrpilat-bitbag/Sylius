@@ -18,7 +18,8 @@ use Sylius\Component\Order\Modifier\OrderModifierInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Webmozart\Assert\Assert;
 
-final readonly class CartItemRemoveListener {
+final readonly class CartItemRemoveListener
+{
     public function __construct(private OrderModifierInterface $orderModifier)
     {
     }

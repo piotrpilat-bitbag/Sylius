@@ -1,15 +1,15 @@
-# Konfiguracja FrankenPHP dla joba CI mierzącego izolację requestów.
+# FrankenPHP configuration for a CI job measuring request isolation.
 #
-# Trzy ustawienia poniżej nie są kosmetyką — bez nich pomiar przestaje działać
-# i nikt tego nie zauważy, bo suita po prostu świeci na zielono.
+# The three settings below are not cosmetic — without them, the measurement stops
+# working and no one notices because the test suite stays green.
 #
-#   worker … 1          JEDEN worker. Przy wielu kolejne requesty lądują
-#                       w różnych procesach i przeniesiony stan wygląda losowo.
-#   FRANKENPHP_LOOP_MAX Ustawiane w env na -1. Domyślne 500 restartuje proces
-#                       co pięćset requestów i kasuje ślad. Recykling NIE usuwa
-#                       błędów poprawnościowych, tylko objaw pamięciowy.
-#   APP_ENV=prod        W dev profiler i kontener debugowy dokładają własny stan
-#                       per request i topią sygnał.
+#   worker … 1          A SINGLE worker. With multiple workers, consecutive requests
+#                       land in different processes and leaked state appears random.
+#   FRANKENPHP_LOOP_MAX Set in env to -1. The default of 500 restarts the process
+#                       every 500 requests, wiping the trace. Worker recycling does
+#                       NOT fix correctness bugs; it only masks the memory symptom.
+#   APP_ENV=prod        In dev, the profiler and debug container introduce their own
+#                       per-request state and drown out the signal.
 
 {
 	{$CADDY_GLOBAL_OPTIONS}
@@ -28,8 +28,9 @@
 	root {$APP_PATH:/app}/public
 	encode zstd br gzip
 
-	# Pozwala każdej odpowiedzi powiedzieć, w jakim trybie powstała — przydatne,
-	# gdy scenariusz pada i trzeba ustalić, czy w ogóle mierzyliśmy worker mode.
+# Allows each response to report which mode it was generated in — useful
+# when a scenario fails and you need to verify if worker mode was actually being measured.
+
 	header X-Franken-Worker "{$WORKER_MODE_HEADER:1}"
 
 	php_server {

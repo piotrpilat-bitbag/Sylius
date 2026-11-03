@@ -1,43 +1,10 @@
-#  Audyt izolacji requestów w trybie worker (FrankenPHP).
-#
-#  Mierzy jedno: czy request widzi stan poprzedniego requestu, gdy proces PHP
-#  nie umiera między nimi. Pozostałe joby e2e stawiają serwer kończący życie po
-#  odpowiedzi, więc z definicji nie są w stanie tego zobaczyć.
-#
-#  ŚWIADOMIE BEZ MACIERZY. Wyciek stanu bierze się ze współdzielonych serwisów
-#  w kontenerze, nie z wersji PHP ani Symfony — te same serwisy przenoszą te
-#  same pola na każdej z nich. Kombinatoryka należy do pozostałych jobów e2e;
-#  tutaj dołożyłaby tylko czas i wymusiła wpis w matrix.json. Jedno uruchomienie
-#  na aktualnej wersji wystarczy.
-#
-#  Wersja PHP jest jedną wartością w jednym miejscu, bo musi się zgadzać
-#  w dwóch: setup-php buduje aplikację, a obraz FrankenPHP ją serwuje. Gdy się
-#  rozjadą, platform_check.php wywali aplikację przy starcie.
-#
-#  Co BuildTestAppAction@v4 robi (odczytane z logu joba "Tests (MariaDB) / UI",
-#  Sylius/Sylius run 41054186132):
-#
-#      sudo service mysql stop ; docker run -d <baza>
-#      DATABASE_URL=… >> $GITHUB_ENV
-#      shivammathur/setup-php@v2
-#      actions/cache@v4
-#      [e2e_js] chromedriver          — bramkowane przez e2e_js, NIE przez e2e
-#      [e2e]    symfony server:start --port=8080 --dir=./public --daemon --no-tls
-#      doctrine:database:create / assets:install / cache:warmup
-#      sylius:fixtures:load -n
-#
-#  Stąd dwie rzeczy w tym jobie: port 8080 trzeba zwolnić, a fixtures suity
-#  `worker` ładujemy PO akcji, bo kanał B kopiuje już istniejący katalog.
+
 
 name: Tests (worker mode)
 
 on:
     workflow_dispatch: ~
-    #  Tymczasowo, na czas dopinania suity: workflow_dispatch dziala tylko dla
-    #  workflowow obecnych na galezi domyslnej, a ten tam jeszcze nie jest.
-    #  Nazwa `upmerge/**` jest wybrana celowo — ci__minimal.yaml ma ja w
-    #  branches-ignore, a ci__full.yaml reaguje tylko na full-ci/**, wiec push
-    #  nie odpala dwudziestu pozostalych jobow. DO USUNIECIA przed zgloszeniem.
+    #  Temporary
     push:
         branches:
             - 'upmerge/worker-mode'
@@ -53,12 +20,7 @@ permissions:
     contents: read
 
 env:
-    #  Te same srodowisko, co pozostale joby e2e. W `dev` DoctrineMetadataCacheWarmer
-    #  wywala cache:clear ("must load metadata first"), a profiler dokladalby wlasny
-    #  stan per request i topil sygnal. test_cached ma APP_DEBUG=0.
     APP_ENV: test_cached
-    #  Kanalem A jest kanal domyslny z fixtures Sylusa. Ta zmienna nadaje mu
-    #  hostname — czyta ja suita `default` przez %env(resolve:...)%.
     SYLIUS_FIXTURES_HOSTNAME: channel-a.localhost
     WORKER_CHANNEL_A: http://channel-a.localhost:8080
     WORKER_CHANNEL_B: http://channel-b.localhost:8080
@@ -88,8 +50,6 @@ jobs:
                 if: "${{ inputs.branch == '' }}"
                 uses: actions/checkout@v4
 
-            #  Bez tego cache:warmup nie ma czego czytac i sypie sie na brakujacym
-            #  manifescie. Pozostale joby e2e robia dokladnie to samo.
             -   name: "Prepare manifest.json files"
                 run: |
                     mkdir -p public/build/admin public/build/shop
@@ -111,15 +71,6 @@ jobs:
                     php_version: ${{ env.PHP_VERSION }}
                     symfony_version: ${{ env.SYMFONY_VERSION }}
 
-            #  Akcja wystartowala serwer Symfony CLI na 8080 (--daemon). Trzeba
-            #  go zdjac, zanim wstanie FrankenPHP na tym samym porcie.
-            #  Jedyny dodatek po stronie BADANEGO systemu, nie przyrzadu: bez
-            #  tego runtime'u Symfony nie wstanie w trybie worker w ogole.
-            #
-            #  Instalowane PO zbudowaniu aplikacji, bo `--no-update` przed akcja
-            #  tylko dopisuje wpis do composer.json, a instalacja z locka go nie
-            #  podnosi — pakiet nie trafia do vendor/ i aplikacja wywala sie na
-            #  brakujacej klasie APP_RUNTIME, zwracajac 500 na kazdym zadaniu.
             -   name: "Require FrankenPHP runtime"
                 run: |
                     composer require --dev --no-interaction --no-progress --no-scripts \
@@ -170,16 +121,9 @@ jobs:
                         exit 1
                     fi
 
-            #  Dwa kanały różniące się nazwą, hostname'em, locale i walutą.
-            #  Ładujemy PRZED startem FrankenPHP do bazy przygotowanej przez
-            #  BuildTestAppAction. Fixtures załadują się przez normalny CLI.
             -   name: "Two channels"
                 run: bin/console sylius:fixtures:load worker --no-interaction
 
-            #  Goly obraz FrankenPHP nie ma pdo_mysql — aplikacja wstaje i zwraca
-            #  500 z "could not find driver". Dokladamy rozszerzenia, ktorych
-            #  wymaga sylius/sylius. Budowa trwa kilkadziesiat sekund i jest
-            #  cache'owana przez buildx.
             -   name: "Build the FrankenPHP image"
                 uses: docker/build-push-action@v6
                 with:
@@ -223,8 +167,6 @@ jobs:
                     docker logs --tail=50 franken || true
                     exit 1
 
-            #  Scenariusz, ktory nie mierzy workera, przechodzi na zielono nic
-            #  nie sprawdzajac. Ten krok to straznik przed taka cisza.
             -   name: "Confirm we are really in worker mode"
                 run: |
                     HDR=$(curl -fsSI http://localhost:8080/ | tr -d '\r' | awk -F': ' '/^X-Franken-Worker/{print $2}')
@@ -248,9 +190,6 @@ jobs:
                         echo "  ${host} -> ${name}, ok"
                     done
 
-            #  Osobna suita, nie rozszerzenie @ui. Tamte chodza przez
-            #  friends-of-behat/symfony-extension, ktory bootuje kernel w procesie
-            #  Behata — wtedy nie ma zadnego workera i nie ma czego mierzyc.
             -   name: "Run worker-mode Behat"
                 run: |
                     vendor/bin/behat --strict --no-interaction --colors \

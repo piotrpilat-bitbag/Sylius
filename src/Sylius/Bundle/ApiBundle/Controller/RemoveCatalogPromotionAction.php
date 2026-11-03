@@ -48,7 +48,10 @@ final readonly class RemoveCatalogPromotionAction implements ResetInterface
             );
         }
     }
-    public function reset(): void {
-        $this->catalogPromotionRemovalProcessor = null;
+    public function reset(): void
+    {
+        if ($this->catalogPromotionRemovalProcessor instanceof ResetInterface) {
+            $this->catalogPromotionRemovalProcessor->reset();
+        }
     }
 }
