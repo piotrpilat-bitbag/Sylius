@@ -70,7 +70,11 @@ env:
     WORKER_CHANNEL_B_NAME: Channel B
     PHP_VERSION: '8.4'
     SYMFONY_VERSION: '~7.4.0'
-    FRANKENPHP_VERSION: '1.13'
+    #  NOTE: the PHP version is PINNED TO THE FrankenPHP RELEASE and cannot be
+    #  chosen separately. v1.9.1 ships PHP 8.4; releases from 1.10 ship 8.5. It
+    #  has to match PHP_VERSION above, otherwise the application runs on a
+    #  different version than the one Composer resolved against. Guarded below.
+    FRANKENPHP_RELEASE: 'v1.9.1'
     MYSQL_VERSION: '8.4'
     IGOR_VERSION: '0.10.1'
     #  TEMPORARY, together with the `push` trigger below: the fixes for
@@ -123,31 +127,9 @@ jobs:
                     symfony_version: ${{ env.SYMFONY_VERSION }}
 
             #  The action started the Symfony CLI server on 8080 (--daemon). It
-            #  has to go before FrankenPHP takes the same port.
-            #  The only addition to the system UNDER TEST rather than to the
-            #  instrument: without this runtime Symfony will not come up in
-            #  worker mode at all.
-            #
-            #  Installed AFTER the application is built, because `--no-update`
-            #  before the action only writes the constraint into composer.json
-            #  and the install that follows resolves from the lock and never
-            #  picks it up - the package misses vendor/ and the application dies
-            #  on the missing APP_RUNTIME class, returning 500 on every request.
-            -   name: "Require FrankenPHP runtime"
-                run: |
-                    composer require --dev --no-interaction --no-progress --no-scripts \
-                        "runtime/frankenphp-symfony:^1.0"
-
-                    # Guard: without it a missing runtime shows up only as a 500
-                    # from a healthy-looking server, which sends the
-                    # investigation in the wrong direction.
-                    composer show runtime/frankenphp-symfony > /dev/null || {
-                        echo "::error::runtime/frankenphp-symfony is not installed"
-                        exit 1
-                    }
-
-                    bin/console cache:clear --no-interaction
-
+            #  has to go before FrankenPHP takes the same port - otherwise Behat
+            #  hits the OLD server and the whole suite measures classic mode
+            #  while staying green.
             -   name: "Stop the Symfony CLI server"
                 run: |
                     # BuildTestAppAction starts the server with --dir=./public,
@@ -199,36 +181,55 @@ jobs:
             -   name: "Two channels"
                 run: bin/console sylius:fixtures:load worker --no-interaction
 
-            #  The stock FrankenPHP image has no pdo_mysql - the application
-            #  comes up and returns 500 "could not find driver". This adds the
-            #  extensions sylius/sylius requires. The build takes under a minute
-            #  and buildx caches it.
-            -   name: "Build the FrankenPHP image"
-                uses: docker/build-push-action@v6
-                with:
-                    context: .github/frankenphp
-                    load: true
-                    tags: sylius-worker-runtime:ci
-                    build-args: |
-                        FRANKENPHP_VERSION=${{ env.FRANKENPHP_VERSION }}
-                        PHP_VERSION=${{ env.PHP_VERSION }}
-                    cache-from: type=gha
-                    cache-to: type=gha,mode=max
+            #  A binary instead of an image, for one concrete reason: the
+            #  dunglas/frankenphp image carries NO php.ini at all (`php --ini`
+            #  reports "Loaded Configuration File: (none)"), so PHP_MEMORY_LIMIT
+            #  had nothing to override and the worker ran on the 128M default.
+            #  It grew with every request and died at a random point of the
+            #  suite - which is why the red kept moving between scenarios.
+            #  The binary reads the directory given in PHP_INI_SCAN_DIR, so the
+            #  limit actually applies.
+            #
+            #  This also removes the need for .github/frankenphp/ entirely:
+            #  no Dockerfile, no Caddyfile, no image build.
+            -   name: "Fetch the FrankenPHP binary"
+                run: |
+                    #  Into RUNNER_TEMP rather than /usr/local/bin, which is
+                    #  root-owned on the runner. GITHUB_PATH carries it over to
+                    #  the following steps.
+                    curl -fsSL -o "$RUNNER_TEMP/frankenphp" \
+                        "https://github.com/php/frankenphp/releases/download/${FRANKENPHP_RELEASE}/frankenphp-linux-x86_64"
+                    chmod +x "$RUNNER_TEMP/frankenphp"
+                    echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+                    "$RUNNER_TEMP/frankenphp" version
 
             -   name: "Start FrankenPHP in worker mode"
                 run: |
-                    docker run -d --name franken \
-                        --network host \
-                        --user "$(id -u):$(id -g)" \
-                        -v "$PWD:/app" \
-                        -v "$PWD/.github/frankenphp/Caddyfile:/etc/frankenphp/Caddyfile:ro" \
-                        -e FRANKENPHP_CONFIG="worker /app/public/index.php 1" \
-                        -e FRANKENPHP_LOOP_MAX=-1 \
-                        -e APP_RUNTIME='Runtime\FrankenPhpSymfony\Runtime' \
-                        -e APP_ENV="$APP_ENV" -e APP_DEBUG=0 \
-                        -e DATABASE_URL="$DATABASE_URL" \
-                        -e SERVER_NAME="http://localhost:8080 http://channel-a.localhost:8080 http://channel-b.localhost:8080" \
-                        sylius-worker-runtime:ci
+                    mkdir -p var/frankenphp/php.d var/log
+                    printf 'memory_limit=512M\n' > var/frankenphp/php.d/99-ci.ini
+
+                    #  ONE worker, stated explicitly as ",1". Without the count
+                    #  FrankenPHP starts several of them, consecutive requests
+                    #  land in DIFFERENT processes and carried-over state has
+                    #  nowhere to accumulate - the suite then passes green while
+                    #  measuring nothing.
+                    #
+                    #  FRANKENPHP_LOOP_MAX=-1: the worker must NOT recycle mid
+                    #  suite, because a restart wipes the trace. Recycling does
+                    #  not fix correctness bugs, it only hides the memory symptom.
+                    #
+                    #  No SERVER_NAME: the binary accepts any Host header, so the
+                    #  channel hostnames work without /etc/hosts entries.
+                    PHP_INI_SCAN_DIR="$PWD/var/frankenphp/php.d" \
+                    FRANKENPHP_LOOP_MAX=-1 \
+                    APP_ENV="$APP_ENV" APP_DEBUG=0 \
+                    DATABASE_URL="$DATABASE_URL" \
+                    TEST_SYLIUS_USE_LEGACY_GRID_CONFIG=true \
+                        setsid frankenphp php-server \
+                            --root "$PWD/public" \
+                            --listen 127.0.0.1:8080 \
+                            --worker "$PWD/public/index.php,1" \
+                            < /dev/null > var/log/frankenphp.log 2>&1 &
 
                     for i in $(seq 1 30); do
                         if curl -fsS -o /dev/null http://localhost:8080/; then
@@ -239,21 +240,38 @@ jobs:
                     echo "::error::FrankenPHP did not answer 200 within 30s"
                     echo "--- response body:"
                     curl -s http://localhost:8080/ | head -c 3000 || true
+                    echo "--- frankenphp log:"
+                    tail -c 20000 var/log/frankenphp.log 2>/dev/null || true
                     echo "--- application log ($APP_ENV):"
                     tail -c 20000 "var/log/${APP_ENV}.log" 2>/dev/null || ls -la var/log/ || true
-                    echo "--- docker:"
-                    docker logs --tail=50 franken || true
                     exit 1
 
             #  A scenario that does not measure a worker passes green while
             #  checking nothing. This step guards against that silence.
             -   name: "Confirm we are really in worker mode"
                 run: |
-                    HDR=$(curl -fsSI http://localhost:8080/ | tr -d '\r' | awk -F': ' '/^X-Franken-Worker/{print $2}')
-                    test "$HDR" = "1" || { echo "::error::not worker mode (X-Franken-Worker=$HDR)"; exit 1; }
+                    #  X-Franken-Worker is gone: it came from the Caddyfile,
+                    #  which the binary setup does not use. Two guards instead.
 
-                    #  Caddy serves only the hosts named in SERVER_NAME. A
-                    #  request with any other Host header gets 200 and ZERO
+                    #  1. FrankenPHP is answering, not a forgotten symfony server.
+                    curl -fsSI http://localhost:8080/ | tr -d '\r' | grep -qi '^server:.*caddy' \
+                        || { echo "::error::no Server: Caddy header - something other than FrankenPHP is answering"; exit 1; }
+
+                    #  2. The PHP the SERVER runs matches the one the vendor
+                    #     tree was resolved against. Read from X-Powered-By, not
+                    #     from `frankenphp version`: the point is what is
+                    #     actually answering on 8080, not what sits on disk.
+                    #     On a mismatch platform_check.php returns 500 on every
+                    #     request, which looks like a leak and sends the
+                    #     investigation the wrong way.
+                    SRV_PHP=$(curl -sI http://localhost:8080/ | tr -d '\r' \
+                        | awk -F'PHP/' '/^[Xx]-[Pp]owered-[Bb]y/{print $2}')
+                    test -n "$SRV_PHP" \
+                        || { echo "::error::no X-Powered-By header - cannot confirm WHAT is answering"; exit 1; }
+                    test "${SRV_PHP%.*}" = "$PHP_VERSION" \
+                        || { echo "::error::server PHP ($SRV_PHP) != build PHP ($PHP_VERSION)"; exit 1; }
+
+                    #  A request with an unmatched Host header gets 200 and ZERO
                     #  bytes - not an error, just an empty body. The suite then
                     #  reports "no form" and "no product links", and the
                     #  investigation goes into the data instead of the routing.
@@ -282,7 +300,7 @@ jobs:
             -   name: "Logs"
                 if: failure()
                 run: |
-                    docker logs --tail=200 franken || true
+                    tail -c 50000 var/log/frankenphp.log 2>/dev/null || true
                     tail -c 50000 "var/log/${APP_ENV}.log" 2>/dev/null || ls -la var/log/ || true
 
             #  Static counterpart to the suite above, and ADVISORY ONLY - hence
