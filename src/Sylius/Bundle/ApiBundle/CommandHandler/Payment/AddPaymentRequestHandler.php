@@ -32,10 +32,9 @@ use Sylius\Component\Payment\Repository\PaymentRequestRepositoryInterface;
 use Sylius\Component\Payment\Resolver\PaymentMethodsResolverInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Contracts\Service\ResetInterface;
 
 #[AsMessageHandler]
-final class AddPaymentRequestHandler implements ResetInterface
+final class AddPaymentRequestHandler
 {
     /**
      * @param PaymentMethodRepositoryInterface<PaymentMethodInterface> $paymentMethodRepository
@@ -119,39 +118,5 @@ final class AddPaymentRequestHandler implements ResetInterface
         return null === $customer ||
             null === $customer->getUser() ||
             $order->isCreatedByGuest();
-    }
-    public function reset(): void
-    {
-        if ($this->paymentMethodRepository instanceof ResetInterface) {
-            $this->paymentMethodRepository->reset();
-        }
-
-        if ($this->paymentRepository instanceof ResetInterface) {
-            $this->paymentRepository->reset();
-        }
-
-        if ($this->paymentRequestFactory instanceof ResetInterface) {
-            $this->paymentRequestFactory->reset();
-        }
-
-        if ($this->paymentRequestRepository instanceof ResetInterface) {
-            $this->paymentRequestRepository->reset();
-        }
-
-        if ($this->defaultActionProvider instanceof ResetInterface) {
-            $this->defaultActionProvider->reset();
-        }
-
-        if ($this->defaultPayloadProvider instanceof ResetInterface) {
-            $this->defaultPayloadProvider->reset();
-        }
-
-        if ($this->userContext instanceof ResetInterface) {
-            $this->userContext->reset();
-        }
-
-        if ($this->paymentMethodsResolver instanceof ResetInterface) {
-            $this->paymentMethodsResolver->reset();
-        }
     }
 }

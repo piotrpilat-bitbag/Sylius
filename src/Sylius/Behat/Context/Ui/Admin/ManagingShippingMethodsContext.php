@@ -483,12 +483,9 @@ final readonly class ManagingShippingMethodsContext implements Context
     #[Then('I should be notified that the amount rule has an invalid configuration in :channel channel')]
     public function iShouldBeNotifiedThatTheAmountRuleHasAnInvalidConfigurationInChannel(ChannelInterface $channel): void
     {
-        Assert::oneOf(
+        Assert::same(
             $this->shippingMethodFormElement->getValidationMessage('last_rule_amount', ['%channelCode%' => $channel->getCode()]),
-            [
-                'This value is not a valid money amount.',
-                'Please enter a valid money amount.',
-            ],
+            'This value is not a valid money amount.',
         );
     }
 

@@ -19,7 +19,6 @@ use Sylius\Behat\Context\Hook\GuestCartContext;
 use Sylius\Behat\Context\Hook\MailerContext;
 use Sylius\Behat\Context\Hook\SessionContext;
 use Sylius\Behat\Context\Hook\TestThemeContext;
-use Sylius\Behat\Context\Hook\WorkerDatabaseContext;
 use Sylius\Bundle\ThemeBundle\Configuration\Test\TestThemeConfigurationManagerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -37,14 +36,6 @@ return static function (ContainerConfigurator $container) {
     $services
         ->set('sylius.behat.context.hook.doctrine_orm', DoctrineORMContext::class)
         ->args([service('doctrine.orm.entity_manager')])
-    ;
-
-    //  Used by the `worker` suite instead of hook.doctrine_orm: that one purges
-    //  everything, and this suite's fixtures are loaded before the worker
-    //  starts, with no Given step to bring them back.
-    $services
-        ->set('sylius.behat.context.hook.worker_database', WorkerDatabaseContext::class)
-        ->args([service('doctrine.dbal.default_connection')])
     ;
 
     $services

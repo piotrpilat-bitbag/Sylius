@@ -51,6 +51,29 @@ return (new Config())
                 'symfony' => [
                     'symfony' => null,
                 ],
+                'frankenphp' => [
+                    'browserkit_http' => null,
+                ],
+                //  The second actor in a scenario - the session the steps
+                //  that say "in another browser" switch to. Plain HTTP, so it
+                //  can address a long-running worker in another process.
+                'frankenphp_second' => [
+                    'browserkit_http' => null,
+                ],
+                //  The second actor for scenarios that need JavaScript.
+                'panther_second' => [
+                    'panther' => [
+                        'manager_options' => [
+                            'connection_timeout_in_ms' => 5000,
+                            'request_timeout_in_ms' => 120000,
+                            'capabilities' => [
+                                'goog:chromeOptions' => [
+                                    'args' => ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
                 'chromedriver' => [
                     'chrome' => [
                         'api_url' => 'http://127.0.0.1:9222',

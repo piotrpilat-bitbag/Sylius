@@ -20,10 +20,9 @@ use Sylius\Component\Order\Modifier\OrderModifierInterface;
 use Sylius\Component\Order\Repository\OrderItemRepositoryInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Webmozart\Assert\Assert;
-use Symfony\Contracts\Service\ResetInterface;
 
 #[AsMessageHandler]
-final readonly class RemoveItemFromCartHandler implements ResetInterface
+final readonly class RemoveItemFromCartHandler
 {
     /** @param OrderItemRepositoryInterface<OrderItemInterface> $orderItemRepository */
     public function __construct(
@@ -50,16 +49,5 @@ final readonly class RemoveItemFromCartHandler implements ResetInterface
         $this->orderModifier->removeFromOrder($cart, $orderItem);
 
         return $cart;
-    }
-
-    public function reset(): void
-    {
-        if ($this->orderItemRepository instanceof ResetInterface) {
-            $this->orderItemRepository->reset();
-        }
-
-        if ($this->orderModifier instanceof ResetInterface) {
-            $this->orderModifier->reset();
-        }
     }
 }

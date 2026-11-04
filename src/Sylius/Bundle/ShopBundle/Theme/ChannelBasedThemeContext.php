@@ -48,8 +48,14 @@ final class ChannelBasedThemeContext implements ThemeContextInterface, ResetInte
         return $this->theme;
     }
 
+    /**
+     * `false`, not `null`: it is the "not resolved yet" sentinel. `null` means
+     * "resolved, the channel has no theme", so resetting to `null` would pin
+     * getTheme() in that state and the shop would lose its theme from the
+     * second request onwards.
+     */
     public function reset(): void
     {
-        $this->theme = null;
+        $this->theme = false;
     }
 }
