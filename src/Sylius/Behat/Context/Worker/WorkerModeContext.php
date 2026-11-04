@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Sylius\Behat\Context\Worker;
 
 use Behat\Behat\Context\Context;
+use Behat\Behat\Hook\Scope\BeforeScenarioScope;
+use Behat\Hook\BeforeScenario;
 use Behat\Step\Then;
 use Behat\Step\When;
 use Symfony\Component\BrowserKit\CookieJar;
@@ -69,6 +71,23 @@ final class WorkerModeContext implements Context
 
     private ?string $apiCartCustomerEmail = null;
 
+    /**
+     * Identity of the guest shopper, rebuilt for every scenario.
+     *
+     * The database is NOT purged between scenarios. With one fixed address the
+     * second checkout would walk into the customer, order and addresses left by
+     * the first one, so a single failure poisoned every later checkout and the
+     * suite reported three red scenarios where there was one cause.
+     *
+     * The tag carries the scenario's line number rather than a random string,
+     * so a row left in the database points straight back at the scenario that
+     * created it. The run suffix keeps two runs against the same database from
+     * colliding on that line.
+     */
+    private string $guestTag = '';
+
+    private readonly string $runId;
+
     private readonly string $channelAHost;
 
     private readonly string $channelBHost;
@@ -96,10 +115,11 @@ final class WorkerModeContext implements Context
         //  catalogue, where a freshly created channel would be empty.
         $this->channelAName = getenv('WORKER_CHANNEL_A_NAME') ?: 'Fashion Web Store';
         $this->channelBName = getenv('WORKER_CHANNEL_B_NAME') ?: 'Channel B';
+        $this->runId = bin2hex(random_bytes(2));
     }
 
-    /** @BeforeScenario */
-    public function resetVisitors(): void
+    #[BeforeScenario]
+    public function resetVisitors(BeforeScenarioScope $scope): void
     {
         $this->visitors = [];
         $this->identities = [];
@@ -110,6 +130,7 @@ final class WorkerModeContext implements Context
         $this->apiJwtToken = null;
         $this->apiCartLocale = null;
         $this->apiCartCustomerEmail = null;
+        $this->guestTag = sprintf('s%d-%s', $scope->getScenario()->getLine(), $this->runId);
     }
 
     // ----------------------------------------------------------- steps --
@@ -631,9 +652,22 @@ final class WorkerModeContext implements Context
         //  redirect that follows the final submission.
         $landed = (string) $this->browser()->getHistory()->current()->getUri();
 
+        //  Without the messages a rejected step shows up only as a URL and a
+        //  status, and 422 on the shipping step is then impossible to tell apart
+        //  from an empty cart, a country outside every zone, or a stale form.
+        $errors = $this->browser()->getCrawler()
+            ->filter('.invalid-feedback, .alert, [class*="error"]')
+            ->each(static fn (Crawler $node): string => trim((string) preg_replace('/\s+/', ' ', $node->text())));
+        $errors = array_values(array_filter($errors, static fn (string $e): bool => '' !== $e));
+
         Assert::true(
             str_contains($landed, 'thank-you') || str_contains($landed, '/order'),
-            sprintf('The checkout did not end on an order. Landed on %s (HTTP %d).', $landed, $this->currentStatus()),
+            sprintf(
+                "The checkout did not end on an order. Landed on %s (HTTP %d).\nPage says: %s",
+                $landed,
+                $this->currentStatus(),
+                [] !== $errors ? implode(' | ', array_slice($errors, 0, 5)) : 'no validation messages on the page',
+            ),
         );
     }
 
@@ -943,7 +977,7 @@ final class WorkerModeContext implements Context
             $lower = strtolower($name);
 
             $values[$name] = match (true) {
-                str_contains($lower, 'email') => 'worker+checkout@example.com',
+                str_contains($lower, 'email') => sprintf('worker+checkout+%s@example.com', $this->guestTag),
                 str_contains($lower, 'password') => self::PASSWORD,
                 str_contains($lower, 'postcode') => '00-001',
                 str_contains($lower, 'phone') => '123456789',
