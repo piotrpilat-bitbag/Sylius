@@ -1,7 +1,15 @@
 <?php
 
-declare(strict_types=1);
+/*
+ * This file is part of the Sylius package.
+ *
+ * (c) Sylius Sp. z o.o.
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
+declare(strict_types=1);
 
 use Symfony\Component\DependencyInjection\Argument\ServiceClosureArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -217,8 +225,8 @@ $discovery = new class($aliasSnapshot, $appDir, $env) implements CompilerPassInt
         }
 
         if (\is_object($data)) {
-            $isServiceClosure = ($data instanceof ServiceClosureArgument)
-                || str_ends_with($data::class, 'ServiceClosureArgument');
+            $isServiceClosure = ($data instanceof ServiceClosureArgument) ||
+                str_ends_with($data::class, 'ServiceClosureArgument');
             $childParentShared = $isServiceClosure ? false : $parentShared;
 
             if (method_exists($data, 'getValues')) {

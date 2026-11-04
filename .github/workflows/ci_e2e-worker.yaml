@@ -61,13 +61,6 @@ env:
     #  first"), and the profiler would add per-request state of its own and
     #  drown the signal. test_cached has APP_DEBUG=0.
     APP_ENV: test_cached
-    #  Channel A is Sylius' default fixture channel. This variable gives it a
-    #  hostname; the `default` suite reads it through %env(resolve:...)%.
-    SYLIUS_FIXTURES_HOSTNAME: channel-a.localhost
-    WORKER_CHANNEL_A: http://channel-a.localhost:8080
-    WORKER_CHANNEL_B: http://channel-b.localhost:8080
-    WORKER_CHANNEL_A_NAME: Fashion Web Store
-    WORKER_CHANNEL_B_NAME: Channel B
     PHP_VERSION: '8.4'
     SYMFONY_VERSION: '~7.4.0'
     #  NOTE: the PHP version is PINNED TO THE FrankenPHP RELEASE and cannot be
@@ -83,6 +76,15 @@ env:
     #  fork so that this suite measures the INTENDED end state rather than half
     #  the fixes. After the release: empty this variable and the step below
     #  skips itself.
+    #
+    #  The BRANCH TIP, deliberately: the fork is developed alongside this
+    #  suite, so a pin here would be a second place to bump on every push to
+    #  it, and a stale one would quietly measure old code. The step below
+    #  records WHICH commit a run resolved, which is what the A5 gate needs -
+    #  it compares three runs of one Sylius commit and has to be able to tell
+    #  "same red list" from "different resource-bundle". Appending
+    #  `#<commit>` here still works and is then asserted, for the length of
+    #  that gate.
     RESOURCE_BUNDLE_REF: 'dev-feature/1.15/OP-617 as 1.15.99'
     RESOURCE_BUNDLE_REPO: 'https://github.com/piotrpilat-bitbag/SyliusResourceBundle.git'
 
@@ -114,17 +116,67 @@ jobs:
                     echo "{}" > public/build/app/admin/manifest.json
                     echo "{}" > public/build/app/shop/manifest.json
 
+            #  setup-php, inside BuildTestAppAction, installs symfony-cli as a
+            #  "tool" - and when that download fails it prints
+            #
+            #      x symfony-cli Could not setup symfony-cli
+            #
+            #  and still reports the step as SUCCESSFUL. The job then dies
+            #  roughly a minute later, inside the same action, on
+            #  `symfony server:start` with "symfony: command not found" and exit
+            #  127 - an error that points nowhere near the cause. It happened
+            #  three times in one five-minute window on 2026-11-05 (runs
+            #  41998734932 and 41998741713) and a plain re-run of the identical
+            #  commit went green, so it is a transient download, not a defect
+            #  here.
+            #
+            #  Installing the binary up front makes the job immune: setup-php
+            #  may still print its x, the binary is already on PATH by then.
+            -   name: "Install Symfony CLI"
+                run: |
+                    for i in 1 2 3; do
+                        curl -fsSL https://get.symfony.com/cli/installer | bash && break
+                        echo "symfony-cli installer failed, attempt ${i}/3"
+                        sleep 5
+                    done
+                    echo "$HOME/.symfony5/bin" >> "$GITHUB_PATH"
+                    "$HOME/.symfony5/bin/symfony" version
+
             -   name: "Build application"
                 uses: SyliusLabs/BuildTestAppAction@v4
                 with:
                     build_type: sylius
-                    cache_key: ${{ github.run_id }}-${{ runner.os }}-${{ hashFiles('composer.json') }}-worker
-                    cache_restore_key: ${{ github.run_id }}-${{ runner.os }}-${{ hashFiles('composer.json') }}-worker
+                    #  NO `github.run_id` here, unlike the matrix e2e jobs. There
+                    #  it makes the cache shared between the jobs of one run and
+                    #  dropped afterwards; here the workflow has a SINGLE job, so
+                    #  the run id would make every key unique and the cache would
+                    #  never hit - every run re-downloading the whole tree from
+                    #  packagist and github, which is both slow and one more
+                    #  network call that can fail. This is Composer's DOWNLOAD
+                    #  cache, keyed by package and version; composer.lock is not
+                    #  committed, so reusing it across runs cannot pin a
+                    #  resolution.
+                    #  The hash goes LAST: `cache_restore_key` is a prefix
+                    #  match, so it has to be a prefix of `cache_key` to ever
+                    #  fall back to an older entry.
+                    cache_key: ${{ runner.os }}-worker-${{ hashFiles('composer.json') }}
+                    cache_restore_key: ${{ runner.os }}-worker-
                     database: mysql:${{ env.MYSQL_VERSION }}
                     e2e: 'yes'
+                    e2e_js: 'yes'
+                    chrome_version: stable
                     node_version: 24.x
                     php_version: ${{ env.PHP_VERSION }}
                     symfony_version: ${{ env.SYMFONY_VERSION }}
+
+            #  Belt and braces for the step above. If symfony-cli is missing at
+            #  this point the next steps fail on a misleading `command not
+            #  found`; fail here instead, where the message names the cause.
+            -   name: "Confirm Symfony CLI is present"
+                run: |
+                    command -v symfony >/dev/null \
+                        || { echo "::error::symfony-cli is not on PATH - setup-php reports 'Could not setup symfony-cli' and still marks its step successful"; exit 1; }
+                    symfony version
 
             #  The action started the Symfony CLI server on 8080 (--daemon). It
             #  has to go before FrankenPHP takes the same port - otherwise Behat
@@ -157,12 +209,6 @@ jobs:
                         exit 1
                     fi
 
-            #  Two channels differing in name, hostname, locale and currency.
-            #  The names do not have to resolve: HttpBrowser sets the Host
-            #  header itself, so no /etc/hosts entry is needed.
-            #  The API scenarios log in over JWT. Without a keypair
-            #  /api/v2/shop/customers/token returns 500 and the suite reports it
-            #  as a failed login.
             -   name: "Resource bundle from the fork"
                 if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
                 run: |
@@ -175,29 +221,68 @@ jobs:
                     composer show sylius/resource-bundle | head -3
                     bin/console cache:clear --no-interaction
 
-            -   name: "JWT keypair"
-                run: bin/console lexik:jwt:generate-keypair --skip-if-exists --no-interaction
-
-            -   name: "Two channels"
-                run: bin/console sylius:fixtures:load worker --no-interaction
-
-            #  A binary instead of an image, for one concrete reason: the
-            #  dunglas/frankenphp image carries NO php.ini at all (`php --ini`
-            #  reports "Loaded Configuration File: (none)"), so PHP_MEMORY_LIMIT
-            #  had nothing to override and the worker ran on the 128M default.
-            #  It grew with every request and died at a random point of the
-            #  suite - which is why the red kept moving between scenarios.
-            #  The binary reads the directory given in PHP_INI_SCAN_DIR, so the
-            #  limit actually applies.
+            #  Two jobs in one. First, a dropped fork is silent: the suite
+            #  stays green until some scenario happens to walk into one of the
+            #  unreleased fixes, and then reports a leak that is really a
+            #  missing dependency. That is exactly what 51fe357b22 (step
+            #  deleted) followed by 496840d6ec (locale scenario added) cost -
+            #  one full red cycle.
             #
-            #  This also removes the need for .github/frankenphp/ entirely:
-            #  no Dockerfile, no Caddyfile, no image build.
+            #  Second, it RECORDS the commit this run resolved. Without that,
+            #  comparing three runs for the A5 gate cannot distinguish "the
+            #  suite is flaky" from "the fork moved under it".
+            -   name: "Confirm the resource-bundle fork is installed"
+                if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
+                run: |
+                    installed=$(composer show sylius/resource-bundle 2>&1 || true)
+                    echo "$installed"
+
+                    #  `composer show` prints `source : [git] <url> <commit>`.
+                    sha=$(echo "$installed" | awk '/^source/ && /\[git\]/ { print $NF }' | head -1)
+
+                    #  What to assert on. NOT the `as <version>` alias: that
+                    #  exists only while Composer resolves, and `composer show`
+                    #  prints the real one - `versions : * dev-<branch>`. So
+                    #  strip the alias, then assert the commit when the ref
+                    #  pins one and the branch when it does not.
+                    ref="${RESOURCE_BUNDLE_REF%% as *}"
+                    case "$ref" in
+                        *'#'*)
+                            want="${ref#*#}"
+                            needle="${want:0:8}"
+                            ;;
+                        *)
+                            needle="$ref"
+                            ;;
+                    esac
+
+                    echo "$installed" | grep -q "$needle" \
+                        || { echo "::error::sylius/resource-bundle is not the expected fork (looked for '${needle}') - ResourceTranslationsType then freezes the locale list in its constructor and the admin locale scenario fails for the wrong reason"; exit 1; }
+
+                    echo "resource-bundle: ${RESOURCE_BUNDLE_REF} -> ${sha:-unknown}"
+                    {
+                        echo "| | |"
+                        echo "|---|---|"
+                        echo "| resource-bundle ref | \`${RESOURCE_BUNDLE_REF}\` |"
+                        echo "| resolved commit | \`${sha:-unknown}\` |"
+                        echo "| sylius commit | \`${GITHUB_SHA}\` |"
+                    } >> "$GITHUB_STEP_SUMMARY"
+
             -   name: "Fetch the FrankenPHP binary"
                 run: |
                     #  Into RUNNER_TEMP rather than /usr/local/bin, which is
                     #  root-owned on the runner. GITHUB_PATH carries it over to
                     #  the following steps.
-                    curl -fsSL -o "$RUNNER_TEMP/frankenphp" \
+                    #
+                    #  --retry, for the same reason symfony-cli is installed by
+                    #  hand above: a single unretried fetch from a release host
+                    #  is a single point of failure for the whole job.
+                    #  --retry-all-errors covers the connection resets, not only
+                    #  the HTTP statuses curl retries by default. A truncated
+                    #  download survives this, which is what `frankenphp version`
+                    #  below is for.
+                    curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 \
+                        -o "$RUNNER_TEMP/frankenphp" \
                         "https://github.com/php/frankenphp/releases/download/${FRANKENPHP_RELEASE}/frankenphp-linux-x86_64"
                     chmod +x "$RUNNER_TEMP/frankenphp"
                     echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
@@ -271,31 +356,70 @@ jobs:
                     test "${SRV_PHP%.*}" = "$PHP_VERSION" \
                         || { echo "::error::server PHP ($SRV_PHP) != build PHP ($PHP_VERSION)"; exit 1; }
 
-                    #  A request with an unmatched Host header gets 200 and ZERO
-                    #  bytes - not an error, just an empty body. The suite then
-                    #  reports "no form" and "no product links", and the
-                    #  investigation goes into the data instead of the routing.
-                    #  Measured, not guessed.
-                    for ch in a b; do
-                        host="channel-${ch}.localhost:8080"
-                        if [ "$ch" = "a" ]; then name="$WORKER_CHANNEL_A_NAME"; else name="$WORKER_CHANNEL_B_NAME"; fi
-
-                        body=$(curl -fsSL "http://${host}/" || true)
-                        if ! printf '%s' "$body" | grep -qF "$name"; then
-                            echo "::error::${host} does not render channel \"${name}\" (response: ${#body} bytes)"
-                            printf '%s' "$body" | head -c 1000
-                            exit 1
-                        fi
-                        echo "  ${host} -> ${name}, ok"
-                    done
+                    #  Confirm the server responds. Scenarios create channels dynamically
+                    #  in Background steps, so any HTTP response (even 500 when no
+                    #  channels exist yet) confirms FrankenPHP is alive and reachable.
+                    code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ 2>/dev/null || true)
+                    test "$code" != "000" \
+                        || { echo "::error::server is not responding"; exit 1; }
+                    echo "  server answered with HTTP ${code}, ok"
 
             #  A suite of its own, not an extension of @ui. Those talk to a
             #  kernel booted inside the Behat process, and then there is no
             #  worker left to measure.
             -   name: "Run worker-mode Behat"
+                env:
+                    SYLIUS_BEHAT_SECOND_SESSION: frankenphp_second
+                    SYLIUS_BEHAT_API_WORKER: true
+                #  Every suite runs, whatever the ones before it did, and the
+                #  step reports the WHOLE list of red ones at the end. Under the
+                #  default `set -e` the first failure killed the step, so a red
+                #  `admin` hid `api`, `checkout` and `cart` entirely - on
+                #  2026-11-05 that cost a full cycle in which the shop-API
+                #  scenarios never ran once. Eight suites, eight results, one
+                #  run.
+                shell: bash
                 run: |
-                    vendor/bin/behat --strict --no-interaction --colors \
-                        --suite worker --tags="~@todo"
+                    failed=""
+
+                    run_suite() {
+                        name="$1"; shift
+                        echo "::group::Behat: ${name}"
+                        if "$@"; then
+                            echo "::endgroup::"
+                        else
+                            echo "::endgroup::"
+                            echo "::error::Behat suite '${name}' failed"
+                            failed="${failed} ${name}"
+                        fi
+                    }
+
+                    #  `theme` runs FIRST on purpose. InMemoryThemeRepository loads the
+                    #  theme list once per process, lazily, on the first rendered shop
+                    #  page. Test themes only exist from a scenario's Background onwards,
+                    #  so a worker that served a shop page earlier has cached an empty
+                    #  list and never reloads it - the suite would then go red for having
+                    #  nothing to measure, not for finding a leak.
+                    for s in theme channel currency locale customer admin checkout; do
+                        run_suite "$s" \
+                            vendor/bin/behat --strict --no-interaction --colors \
+                                --suite "ui_frankenphp_${s}_isolation" --tags="~@todo"
+                    done
+
+                    run_suite api \
+                        vendor/bin/behat --strict --no-interaction --colors \
+                            --suite api_frankenphp_isolation --tags="~@todo"
+
+                    run_suite cart \
+                        env PATH="$PWD/drivers:$PATH" SYLIUS_BEHAT_SECOND_SESSION=panther_second \
+                            vendor/bin/behat --strict --no-interaction --colors \
+                                --suite ui_frankenphp_cart_isolation --tags="~@todo"
+
+                    if [ -n "$failed" ]; then
+                        echo "::error::red suites:${failed}"
+                        exit 1
+                    fi
+                    echo "every suite passed"
 
             -   name: "Logs"
                 if: failure()

@@ -20,7 +20,8 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
-final class ResendOrderConfirmationEmailWithValidOrderStateValidator extends ConstraintValidator {
+final class ResendOrderConfirmationEmailWithValidOrderStateValidator extends ConstraintValidator
+{
     /**
      * @param RepositoryInterface<OrderInterface> $orderRepository
      * @param array<string, string> $orderStatesToAllowResendingConfirmationEmail

@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the Sylius package.
+ *
+ * (c) Sylius Sp. z o.o.
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 /*
@@ -105,8 +114,8 @@ $sortByWeight = static function (array &$rows): void {
 };
 
 echo "### Igor - static worker-mode audit\n\n";
-echo "Advisory. This step never fails the job: the analysis is a heuristic and ";
-echo "cannot tell a mutation of an injected dependency from a plain method call ";
+echo 'Advisory. This step never fails the job: the analysis is a heuristic and ';
+echo 'cannot tell a mutation of an injected dependency from a plain method call ';
 echo "on it, so most rows below are false positives. Read it as a shortlist, not a verdict.\n\n";
 
 echo "| scope | services with findings | findings | of them ERROR |\n";
@@ -130,7 +139,7 @@ if (0 === $buckets['project']['services']) {
     $sortByWeight($buckets['project']['top']);
 
     echo "#### Sylius services, by weight\n\n";
-    echo "A service disappears from this list once it is tagged `kernel.reset` - that ";
+    echo 'A service disappears from this list once it is tagged `kernel.reset` - that ';
     echo "is how the already-fixed ones stopped showing up.\n\n";
     echo "| service | findings | first message |\n";
     echo "|---|---:|---|\n";
@@ -153,7 +162,7 @@ if (0 === $buckets['project']['services']) {
 
 $sortByWeight($buckets['vendor']['top']);
 
-echo "<details><summary>Third-party packages (" . $buckets['vendor']['services'] . " services)</summary>\n\n";
+echo '<details><summary>Third-party packages (' . $buckets['vendor']['services'] . " services)</summary>\n\n";
 echo "Not actionable here. Worth forwarding to the respective maintainers.\n\n";
 echo "| service | findings |\n|---|---:|\n";
 
