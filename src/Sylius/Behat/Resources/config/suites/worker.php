@@ -36,7 +36,10 @@ return (new Config())
         (new Profile('default'))
         ->withSuite(
             (new Suite('worker'))
-            ->withContexts(WorkerModeContext::class)
+            ->withContexts(
+                'sylius.behat.context.hook.worker_database',
+                WorkerModeContext::class,
+            )
             ->withPaths('features/worker')
             ->withFilter(new TagFilter('@worker')),
         ),
