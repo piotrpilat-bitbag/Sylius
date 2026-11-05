@@ -61,13 +61,13 @@ env:
     #  first"), and the profiler would add per-request state of its own and
     #  drown the signal. test_cached has APP_DEBUG=0.
     APP_ENV: test_cached
-    PHP_VERSION: '8.4'
+    PHP_VERSION: '8.5'
     SYMFONY_VERSION: '~7.4.0'
     #  NOTE: the PHP version is PINNED TO THE FrankenPHP RELEASE and cannot be
-    #  chosen separately. v1.9.1 ships PHP 8.4; releases from 1.10 ship 8.5. It
-    #  has to match PHP_VERSION above, otherwise the application runs on a
-    #  different version than the one Composer resolved against. Guarded below.
-    FRANKENPHP_RELEASE: 'v1.9.1'
+    #  chosen separately. v1.13.5 ships PHP 8.5. It has to match PHP_VERSION
+    #  above, otherwise the application runs on a different version than the one
+    #  Composer resolved against. Guarded below.
+    FRANKENPHP_RELEASE: 'v1.13.5'
     MYSQL_VERSION: '8.4'
     IGOR_VERSION: '0.10.1'
     #  TEMPORARY, together with the `push` trigger below: the fixes for
