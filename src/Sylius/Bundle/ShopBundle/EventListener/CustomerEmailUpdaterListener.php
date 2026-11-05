@@ -28,8 +28,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Webmozart\Assert\Assert;
 
-final readonly class CustomerEmailUpdaterListener
-{
+final readonly class CustomerEmailUpdaterListener {
     public function __construct(
         private GeneratorInterface $tokenGenerator,
         private ChannelContextInterface $channelContext,

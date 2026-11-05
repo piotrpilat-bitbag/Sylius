@@ -19,8 +19,7 @@ use Sylius\Component\Core\ShippingMethod\Updater\ChannelAwareShippingMethodUpdat
 use Sylius\Resource\Exception\UnexpectedTypeException;
 use Sylius\Resource\Symfony\EventDispatcher\GenericEvent;
 
-final readonly class ChannelDeletionListener
-{
+final readonly class ChannelDeletionListener {
     public function __construct(
         private ChannelDeletionCheckerInterface $channelDeletionChecker,
         private ChannelAwareShippingMethodUpdaterInterface $shippingMethodUpdater,

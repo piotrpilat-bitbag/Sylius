@@ -22,8 +22,7 @@ use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Webmozart\Assert\Assert;
 
-final class ApplyCatalogPromotionsOnVariantsHandler
-{
+final class ApplyCatalogPromotionsOnVariantsHandler {
     /** @param EligibleCatalogPromotionsProviderInterface<CatalogPromotionInterface> $catalogPromotionsProvider */
     public function __construct(
         private EligibleCatalogPromotionsProviderInterface $catalogPromotionsProvider,

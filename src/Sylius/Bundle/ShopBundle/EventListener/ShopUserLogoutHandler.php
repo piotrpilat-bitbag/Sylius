@@ -17,8 +17,7 @@ use Sylius\Component\Channel\Context\ChannelContextInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Storage\CartStorageInterface;
 
-final class ShopUserLogoutHandler
-{
+final class ShopUserLogoutHandler {
     public function __construct(
         private ChannelContextInterface $channelContext,
         private CartStorageInterface $cartStorage,

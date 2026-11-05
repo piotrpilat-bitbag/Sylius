@@ -1,0 +1,38 @@
+# Konfiguracja FrankenPHP dla joba CI mierzącego izolację requestów.
+#
+# Trzy ustawienia poniżej nie są kosmetyką — bez nich pomiar przestaje działać
+# i nikt tego nie zauważy, bo suita po prostu świeci na zielono.
+#
+#   worker … 1          JEDEN worker. Przy wielu kolejne requesty lądują
+#                       w różnych procesach i przeniesiony stan wygląda losowo.
+#   FRANKENPHP_LOOP_MAX Ustawiane w env na -1. Domyślne 500 restartuje proces
+#                       co pięćset requestów i kasuje ślad. Recykling NIE usuwa
+#                       błędów poprawnościowych, tylko objaw pamięciowy.
+#   APP_ENV=prod        W dev profiler i kontener debugowy dokładają własny stan
+#                       per request i topią sygnał.
+
+{
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp {
+		worker {$APP_PATH:/app}/public/index.php {$FRANKENPHP_WORKERS:1}
+	}
+}
+
+{$SERVER_NAME:http://localhost:8080} {
+	log {
+		format console
+		level ERROR
+	}
+
+	root {$APP_PATH:/app}/public
+	encode zstd br gzip
+
+	# Pozwala każdej odpowiedzi powiedzieć, w jakim trybie powstała — przydatne,
+	# gdy scenariusz pada i trzeba ustalić, czy w ogóle mierzyliśmy worker mode.
+	header X-Franken-Worker "{$WORKER_MODE_HEADER:1}"
+
+	php_server {
+		index index.php
+	}
+}

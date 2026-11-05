@@ -21,8 +21,7 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Webmozart\Assert\Assert;
 
-final class InStockValidator extends ConstraintValidator
-{
+final class InStockValidator extends ConstraintValidator {
     private PropertyAccessor $accessor;
 
     public function __construct(private AvailabilityCheckerInterface $availabilityChecker)
