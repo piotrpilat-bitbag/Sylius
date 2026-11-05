@@ -25,8 +25,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
     name: 'sylius:price-history:clear',
     description: 'Clears the price history up to a given number of days ago',
 )]
-final class ClearPriceHistoryCommand extends Command
-{
+final class ClearPriceHistoryCommand extends Command {
     private SymfonyStyle $io;
 
     public function __construct(private ChannelPricingLogEntriesRemoverInterface $channelPricingLogEntriesRemover)

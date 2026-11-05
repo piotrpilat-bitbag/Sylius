@@ -20,5 +20,6 @@ return (new Config())
         'suites/domain.php',
         'suites/hybrid.php',
         'suites/ui.php',
+        'suites/worker.php',
     ])
 ;

@@ -27,8 +27,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
     name: 'sylius:admin-user:change-password',
     description: 'Change password of admin user',
 )]
-final class ChangeAdminUserPasswordCommand extends Command
-{
+final class ChangeAdminUserPasswordCommand extends Command {
     protected SymfonyStyle $io;
 
     /** @param UserRepositoryInterface<AdminUserInterface> $adminUserRepository */

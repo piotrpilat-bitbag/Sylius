@@ -26,8 +26,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-final class PaymentMethodNotifyAction
-{
+final class PaymentMethodNotifyAction {
     /**
      * @param PaymentMethodRepositoryInterface<PaymentMethodInterface> $paymentMethodRepository
      * @param PaymentRequestFactoryInterface<PaymentRequestInterface> $paymentRequestFactory

@@ -19,8 +19,9 @@ use Sylius\Bundle\ThemeBundle\Repository\ThemeRepositoryInterface;
 use Sylius\Component\Channel\Context\ChannelContextInterface;
 use Sylius\Component\Channel\Context\ChannelNotFoundException;
 use Sylius\Component\Core\Model\ChannelInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
-final class ChannelBasedThemeContext implements ThemeContextInterface
+final class ChannelBasedThemeContext implements ThemeContextInterface, ResetInterface
 {
     private false|ThemeInterface|null $theme = false;
 
@@ -45,5 +46,10 @@ final class ChannelBasedThemeContext implements ThemeContextInterface
         }
 
         return $this->theme;
+    }
+
+    public function reset(): void
+    {
+        $this->theme = null;
     }
 }

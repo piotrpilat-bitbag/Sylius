@@ -21,8 +21,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
 
-final readonly class CurrencySwitchController
-{
+final readonly class CurrencySwitchController {
     use RedirectTrait;
 
     public function __construct(
