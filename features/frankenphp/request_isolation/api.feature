@@ -1,4 +1,4 @@
-@frankenphp_api @api
+@worker @api
 Feature: Shop API request isolation
     In order to ensure API requests remain properly isolated in worker mode
     As an API client

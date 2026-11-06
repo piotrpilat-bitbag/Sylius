@@ -1,4 +1,4 @@
-@frankenphp_cart @mink:frankenphp
+@worker @worker:cart @mink:workerphp
 Feature: Cart isolation between channels in consecutive requests
     In order to shop on several storefronts
     As a Customer

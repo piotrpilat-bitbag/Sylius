@@ -1,4 +1,4 @@
-@frankenphp_theme @mink:frankenphp
+@worker @worker:theme @mink:workerphp
 Feature: Theme isolation between consecutive requests
     In order to serve several channels from one long-lived process
     As a Developer

@@ -1,4 +1,4 @@
-@frankenphp_cart @javascript
+@worker @worker:cart @javascript
 Feature: Cart isolation between consecutive requests
     In order to shop while other people shop too
     As a Customer

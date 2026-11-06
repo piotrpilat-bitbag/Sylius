@@ -1,4 +1,4 @@
-@frankenphp_locale @mink:frankenphp
+@worker @worker:locale @mink:workerphp
 Feature: Locale isolation between consecutive requests
     In order to read the shop in its own language
     As a Customer

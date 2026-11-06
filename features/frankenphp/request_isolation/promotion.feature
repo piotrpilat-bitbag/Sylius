@@ -1,4 +1,4 @@
-@frankenphp_promotion @mink:frankenphp
+@worker @worker:promotion @mink:workerphp
 Feature: Promotion state isolation in FrankenPHP worker mode
 
   Verify promotion system state isolation between requests.

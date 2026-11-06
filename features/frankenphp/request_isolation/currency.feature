@@ -1,4 +1,4 @@
-@frankenphp_currency @mink:frankenphp
+@worker @worker:currency @mink:workerphp
 Feature: Currency isolation between consecutive requests
     In order to see prices in the currency of the shop I am on
     As a Customer

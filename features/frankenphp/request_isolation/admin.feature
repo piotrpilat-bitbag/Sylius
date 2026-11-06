@@ -1,4 +1,4 @@
-@frankenphp_admin @mink:frankenphp
+@worker @worker:admin @mink:workerphp
 Feature: Back office isolation between consecutive requests
     In order to administer the shop all day
     As an Administrator

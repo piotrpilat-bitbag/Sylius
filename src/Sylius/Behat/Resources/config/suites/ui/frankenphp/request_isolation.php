@@ -22,7 +22,7 @@ use Behat\Config\Suite;
  * What makes these suites measure isolation is not their contexts but WHERE
  * the application runs. The features carry a session tag:
  *
- *   @mink:frankenphp  plain HTTP, no browser - for steps that assert on the
+ *   @mink:workerphp   plain HTTP, no browser - for steps that assert on the
  *                     URL, because a browser stays on the URL of a 404 and
  *                     SymfonyPage::verifyUrl() only compares URLs
  *   @javascript       a real browser - needed wherever the shop drives a Live
@@ -43,6 +43,31 @@ use Behat\Config\Suite;
 return (new Config())
     ->withProfile(
         (new Profile('default'))
+        ->withSuite(
+            (new Suite('ui_frankenphp_theme_isolation'))
+            ->withContexts(
+                'sylius.behat.context.hook.bad_gateway',
+                'sylius.behat.context.hook.doctrine_orm',
+                'sylius.behat.context.hook.session',
+                'sylius.behat.context.hook.test_theme',
+            )
+            ->withContexts(
+                'sylius.behat.context.setup.channel',
+                'sylius.behat.context.setup.theme',
+            )
+            ->withContexts(
+                'sylius.behat.context.transform.channel',
+                'sylius.behat.context.transform.lexical',
+                'sylius.behat.context.transform.shared_storage',
+                'sylius.behat.context.transform.theme',
+            )
+            ->withContexts(
+                'sylius.behat.context.ui.channel',
+                'sylius.behat.context.ui.theme',
+            )
+            ->withPaths('features/frankenphp/request_isolation')
+            ->withFilter(new TagFilter('@worker&&@worker:theme&&@ui')),
+        )
         ->withSuite(
             (new Suite('ui_frankenphp_channel_isolation'))
             ->withContexts(
@@ -66,7 +91,7 @@ return (new Config())
                 'sylius.behat.context.ui.shop.product',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_channel&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:channel&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_cart_isolation'))
@@ -107,7 +132,7 @@ return (new Config())
                 'sylius.behat.context.ui.user',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_cart&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:cart&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_customer_isolation'))
@@ -137,7 +162,7 @@ return (new Config())
                 'sylius.behat.context.ui.user',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_customer&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:customer&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_admin_isolation'))
@@ -171,7 +196,7 @@ return (new Config())
                 'sylius.behat.context.ui.save',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_admin&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:admin&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_currency_isolation'))
@@ -195,7 +220,7 @@ return (new Config())
                 'sylius.behat.context.ui.shop.currency',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_currency&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:currency&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_locale_isolation'))
@@ -220,32 +245,7 @@ return (new Config())
                 'sylius.behat.context.ui.shop.locale',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_locale&&@ui')),
-        )
-        ->withSuite(
-            (new Suite('ui_frankenphp_theme_isolation'))
-            ->withContexts(
-                'sylius.behat.context.hook.bad_gateway',
-                'sylius.behat.context.hook.doctrine_orm',
-                'sylius.behat.context.hook.session',
-                'sylius.behat.context.hook.test_theme',
-            )
-            ->withContexts(
-                'sylius.behat.context.setup.channel',
-                'sylius.behat.context.setup.theme',
-            )
-            ->withContexts(
-                'sylius.behat.context.transform.channel',
-                'sylius.behat.context.transform.lexical',
-                'sylius.behat.context.transform.shared_storage',
-                'sylius.behat.context.transform.theme',
-            )
-            ->withContexts(
-                'sylius.behat.context.ui.channel',
-                'sylius.behat.context.ui.theme',
-            )
-            ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_theme&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:locale&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_checkout_isolation'))
@@ -292,7 +292,7 @@ return (new Config())
                 'sylius.behat.context.ui.user',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_checkout&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:checkout&&@ui')),
         )
         ->withSuite(
             (new Suite('ui_frankenphp_promotion_isolation'))
@@ -335,7 +335,7 @@ return (new Config())
                 'sylius.behat.context.ui.user',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_promotion&&@ui')),
+            ->withFilter(new TagFilter('@worker&&@worker:promotion&&@ui')),
         )
         ->withSuite(
             (new Suite('api_frankenphp_isolation'))
@@ -375,7 +375,7 @@ return (new Config())
                 'sylius.behat.context.api.shop.customer',
             )
             ->withPaths('features/frankenphp/request_isolation')
-            ->withFilter(new TagFilter('@frankenphp_api&&@api')),
+            ->withFilter(new TagFilter('@worker&&@api')),
         ),
     )
 ;

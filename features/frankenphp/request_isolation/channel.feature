@@ -1,4 +1,4 @@
-@frankenphp_channel @mink:frankenphp
+@worker @worker:channel @mink:workerphp
 Feature: Channel isolation between consecutive requests
     In order to serve several channels from one long-lived process
     As a Developer

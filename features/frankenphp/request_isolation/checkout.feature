@@ -1,4 +1,4 @@
-@frankenphp_checkout @mink:frankenphp
+@worker @worker:checkout @mink:workerphp
 Feature: Channel isolation after a completed checkout
     In order to keep serving every channel correctly
     As a Developer

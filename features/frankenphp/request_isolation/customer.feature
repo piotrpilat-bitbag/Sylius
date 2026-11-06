@@ -1,4 +1,4 @@
-@frankenphp_customer @mink:frankenphp
+@worker @worker:customer @mink:workerphp
 Feature: Customer isolation between consecutive requests
     In order to see my own account and nobody else's
     As a Customer
