@@ -400,7 +400,7 @@ jobs:
                     #  so a worker that served a shop page earlier has cached an empty
                     #  list and never reloads it - the suite would then go red for having
                     #  nothing to measure, not for finding a leak.
-                    for s in theme channel currency locale customer admin checkout; do
+                    for s in theme channel currency locale customer admin checkout promotion; do
                         run_suite "$s" \
                             vendor/bin/behat --strict --no-interaction --colors \
                                 --suite "ui_frankenphp_${s}_isolation" --tags="~@todo"

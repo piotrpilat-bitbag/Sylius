@@ -44,6 +44,7 @@ if (!\is_array($entries)) {
 // false positives or low-value findings that clutter the report.
 $ignorePatterns = [
     'Mutation detected on a local reference to a shared service',
+    'Mutation of state \'static::$defaultAnnotationReader\' in MappedEventSubscriber::getDefaultAnnotationReader()',
 ];
 
 // Checks whether any ignore pattern matches the finding message.

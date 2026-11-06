@@ -57,3 +57,19 @@ Feature: Promotion state isolation in FrankenPHP worker mode
     And I have 1 product "T-Shirt" in the cart
     When I check the details of my cart
     Then my cart total should be "$100.00"
+
+  @ui
+  Scenario: Coupon promotion applied to cart
+    Given the store has promotion "Holiday Sale" with coupon "SANTA50"
+    And this promotion gives "$50.00" discount to every order
+    And this coupon can be used 1 times
+    And I have product "T-Shirt" in the cart
+    And I applied the coupon with code "SANTA50"
+    When I check the details of my cart
+    Then my cart total should be "$50.00"
+
+  @ui
+  Scenario: Fresh cart in subsequent request does not retain coupon discount
+    Given I have product "T-Shirt" in the cart
+    When I check the details of my cart
+    Then my cart total should be "$100.00"
