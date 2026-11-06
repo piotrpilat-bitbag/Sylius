@@ -69,7 +69,6 @@ env:
     #  Composer resolved against. Guarded below.
     FRANKENPHP_RELEASE: 'v1.13.5'
     MYSQL_VERSION: '8.4'
-    IGOR_VERSION: '0.10.1'
     #  TEMPORARY, together with the `push` trigger below: the fixes for
     #  ResourceTranslationsType and CookieStorage live in sylius/resource-bundle,
     #  which has not released them yet. Until it does, the branch comes from the
@@ -441,16 +440,11 @@ jobs:
             #  Last on purpose. It runs even when the suite went red (the
             #  findings are often the explanation), but after the logs, so a
             #  failing run still opens on the failure rather than on the audit.
+            #
+            #  Uses the IgorPhpBundle (config/bundles.php, test/test_cached) to
+            #  generate the service map, so it runs in the same APP_ENV as the
+            #  rest of the job instead of building a separate prod container.
             -   name: "Igor: static audit (advisory)"
                 if: always()
                 continue-on-error: true
-                run: sh .github/igor/audit.sh
-
-            -   name: "Igor: report"
-                if: always()
-                continue-on-error: true
-                uses: actions/upload-artifact@v4
-                with:
-                    name: igor-audit
-                    path: var/igor/
-                    if-no-files-found: warn
+                run: vendor/bin/igor-php --env test_cached .
