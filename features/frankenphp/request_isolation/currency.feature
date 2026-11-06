@@ -30,3 +30,12 @@ Feature: Currency isolation between consecutive requests
         When I browse the "Web" channel
         Then I should shop using the "EUR" currency
         And I should be able to shop using the "GBP" currency
+
+    @ui
+    Scenario: Switching currency on one channel does not affect the default currency of another channel
+        When I browse the "Web" channel
+        And I switch to the "GBP" currency
+        Then I should shop using the "GBP" currency
+        When I browse the "Mobile" channel
+        Then I should shop using the "USD" currency
+        And I should not be able to shop using the "EUR" currency
