@@ -66,5 +66,38 @@ Feature: Channel isolation after a completed checkout
         And I confirm my order
         Then my order should be completed successfully
         When I log out
-        And I browse the "United States" channel
+        And I try to browse my orders
+        Then I should be denied an access to order list
+        When I browse the "United States" channel
         Then I should see "Banana" product
+
+    @ui
+    Scenario: Orders placed by consecutive customers do not leak between their accounts
+        Given there is a user "sansa@stark.com" identified by "queenInTheNorth"
+        And I am logged in as "robb@stark.com"
+        And I added product "Banana" to the cart
+        And I addressed the cart
+        When I browse the "United States" channel
+        And I completed the shipping step with "Free" shipping method
+        And I completed the payment step with "Offline" payment method
+        And I confirm my order
+        Then my order should be completed successfully
+        When I browse my orders
+        Then I should see a single order in the list
+        When I log out
+        And I try to browse my orders
+        Then I should be denied an access to order list
+        When I am logged in as "sansa@stark.com"
+        And I added product "Banana" to the cart
+        And I addressed the cart
+        When I browse the "United States" channel
+        And I completed the shipping step with "Free" shipping method
+        And I completed the payment step with "Offline" payment method
+        And I confirm my order
+        Then my order should be completed successfully
+        When I browse my orders
+        Then I should see a single order in the list
+        When I log out
+        And I am logged in as "robb@stark.com"
+        And I browse my orders
+        Then I should see a single order in the list
