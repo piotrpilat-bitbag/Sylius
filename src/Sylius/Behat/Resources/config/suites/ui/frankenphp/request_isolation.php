@@ -295,6 +295,49 @@ return (new Config())
             ->withFilter(new TagFilter('@frankenphp_checkout&&@ui')),
         )
         ->withSuite(
+            (new Suite('ui_frankenphp_promotion_isolation'))
+            ->withContexts(
+                'sylius.behat.context.hook.bad_gateway',
+                'sylius.behat.context.hook.doctrine_orm',
+                'sylius.behat.context.hook.guest_cart',
+                'sylius.behat.context.hook.session',
+            )
+            ->withContexts(
+                'sylius.behat.context.setup.cart',
+                'sylius.behat.context.setup.channel',
+                'sylius.behat.context.setup.currency',
+                'sylius.behat.context.setup.customer',
+                'sylius.behat.context.setup.payment',
+                'sylius.behat.context.setup.product',
+                'sylius.behat.context.setup.promotion',
+                'sylius.behat.context.setup.shipping',
+                'sylius.behat.context.setup.shop_security',
+                'sylius.behat.context.setup.user',
+                'sylius.behat.context.setup.zone',
+            )
+            ->withContexts(
+                'sylius.behat.context.transform.cart',
+                'sylius.behat.context.transform.channel',
+                'sylius.behat.context.transform.currency',
+                'sylius.behat.context.transform.lexical',
+                'sylius.behat.context.transform.product',
+                'sylius.behat.context.transform.product_variant',
+                'sylius.behat.context.transform.promotion',
+                'sylius.behat.context.transform.shared_storage',
+                'sylius.behat.context.transform.shipping_category',
+                'sylius.behat.context.transform.zone',
+            )
+            ->withContexts(
+                'sylius.behat.context.ui.browser',
+                'sylius.behat.context.ui.channel',
+                'sylius.behat.context.ui.shop.cart',
+                'sylius.behat.context.ui.shop.product',
+                'sylius.behat.context.ui.user',
+            )
+            ->withPaths('features/frankenphp/request_isolation')
+            ->withFilter(new TagFilter('@frankenphp_promotion&&@ui')),
+        )
+        ->withSuite(
             (new Suite('api_frankenphp_isolation'))
             ->withContexts(
                 'sylius.behat.context.hook.bad_gateway',
