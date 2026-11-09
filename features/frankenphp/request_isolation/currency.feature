@@ -1,4 +1,4 @@
-@frankenphp_currency @mink:frankenphp
+@worker @worker:currency @mink:workerphp
 Feature: Currency isolation between consecutive requests
     In order to see prices in the currency of the shop I am on
     As a Customer
@@ -15,7 +15,7 @@ Feature: Currency isolation between consecutive requests
         And the store operates on another channel named "Mobile" in "USD" currency and with hostname "m.localhost.example"
         And that channel allows to shop using "USD" and "GBP" currencies
 
-    @ui
+    @no-api @ui
     Scenario: A channel served after another one offers only its own currencies
         When I browse the "Web" channel
         Then I should shop using the "EUR" currency
@@ -23,7 +23,7 @@ Feature: Currency isolation between consecutive requests
         Then I should shop using the "USD" currency
         And I should not be able to shop using the "EUR" currency
 
-    @ui
+    @no-api @ui
     Scenario: The first channel keeps its own currency after the second one was served
         When I browse the "Mobile" channel
         Then I should shop using the "USD" currency
@@ -31,7 +31,7 @@ Feature: Currency isolation between consecutive requests
         Then I should shop using the "EUR" currency
         And I should be able to shop using the "GBP" currency
 
-    @ui
+    @no-api @ui
     Scenario: Switching currency on one channel does not affect the default currency of another channel
         When I browse the "Web" channel
         And I switch to the "GBP" currency

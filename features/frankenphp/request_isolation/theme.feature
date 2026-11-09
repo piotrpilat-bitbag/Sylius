@@ -1,4 +1,4 @@
-@frankenphp_theme @mink:frankenphp
+@worker @worker:theme @mink:workerphp
 Feature: Theme isolation between consecutive requests
     In order to serve several channels from one long-lived process
     As a Developer
@@ -33,14 +33,14 @@ Feature: Theme isolation between consecutive requests
         And channel "Poland" uses "maverick/meerkat" theme
         And channel "United States" does not use any theme
 
-    @ui
+    @no-api @ui
     Scenario: A channel without a theme does not inherit the one served before it
         When I browse the "Poland" channel
         Then I should see a homepage from that theme
         When I browse the "United States" channel
         Then I should not see a homepage from "maverick/meerkat" theme
 
-    @ui
+    @no-api @ui
     Scenario: A themed channel still gets its theme after a plain one was served
         When I browse the "United States" channel
         Then I should not see a homepage from "maverick/meerkat" theme

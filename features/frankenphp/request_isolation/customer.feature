@@ -1,4 +1,4 @@
-@frankenphp_customer @mink:frankenphp
+@worker @worker:customer @mink:workerphp
 Feature: Customer isolation between consecutive requests
     In order to see my own account and nobody else's
     As a Customer
@@ -14,7 +14,7 @@ Feature: Customer isolation between consecutive requests
         And there is a customer account "robb@stark.com" identified by "KingInTheNorth"
         And there is a customer account "eddard@stark.com" identified by "handOfTheKing"
 
-    @ui
+    @no-api @ui
     Scenario: A customer signing in after another one sees only their own profile
         Given I am logged in as "robb@stark.com"
         When I browse the "United States" channel

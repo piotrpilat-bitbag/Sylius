@@ -1,4 +1,4 @@
-@frankenphp_cart @mink:frankenphp
+@worker @worker:cart @mink:workerphp
 Feature: Cart isolation between channels in consecutive requests
     In order to shop on several storefronts
     As a Customer
@@ -18,7 +18,7 @@ Feature: Cart isolation between channels in consecutive requests
         And the store has a product "Onion" priced at "$10.00" in "Poland" channel
         And there is a customer account "robb@stark.com" identified by "KingInTheNorth"
 
-    @ui
+    @no-api @ui
     Scenario: A cart filled on one channel is not served on the other
         Given I am logged in as "robb@stark.com"
         And I added product "Onion" to the cart
@@ -29,7 +29,7 @@ Feature: Cart isolation between channels in consecutive requests
         And I check the details of my cart
         Then my cart should be empty
 
-    @ui
+    @no-api @ui
     Scenario: The other channel still serves its own catalogue after a shopping session
         Given I am logged in as "robb@stark.com"
         And I added product "Onion" to the cart

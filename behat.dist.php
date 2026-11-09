@@ -51,13 +51,13 @@ return (new Config())
                 'symfony' => [
                     'symfony' => null,
                 ],
-                'frankenphp' => [
+                'workerphp' => [
                     'browserkit_http' => null,
                 ],
                 //  The second actor in a scenario - the session the steps
                 //  that say "in another browser" switch to. Plain HTTP, so it
                 //  can address a long-running worker in another process.
-                'frankenphp_second' => [
+                'workerphp_second' => [
                     'browserkit_http' => null,
                 ],
                 //  The second actor for scenarios that need JavaScript.

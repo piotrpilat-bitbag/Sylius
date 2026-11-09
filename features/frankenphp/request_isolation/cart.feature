@@ -1,4 +1,4 @@
-@frankenphp_cart @javascript
+@worker @worker:cart @javascript
 Feature: Cart isolation between consecutive requests
     In order to shop while other people shop too
     As a Customer
@@ -17,7 +17,7 @@ Feature: Cart isolation between consecutive requests
         And the store allows paying Offline
         And there is a user "robb@stark.com" identified by "KingInTheNorth"
 
-    @ui
+    @no-api @ui
     Scenario: A second shopper's cart does not reach the first one
         Given I am logged in as "robb@stark.com"
         And I have product "PHP T-Shirt" in the cart

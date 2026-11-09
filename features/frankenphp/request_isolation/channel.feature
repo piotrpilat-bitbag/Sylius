@@ -1,4 +1,4 @@
-@frankenphp_channel @mink:frankenphp
+@worker @worker:channel @mink:workerphp
 Feature: Channel isolation between consecutive requests
     In order to serve several channels from one long-lived process
     As a Developer
@@ -16,7 +16,7 @@ Feature: Channel isolation between consecutive requests
         And the store operates on another channel named "United States"
         And the store has a product "Banana" priced at "$5.00" in "United States" channel
 
-    @ui
+    @no-api @ui
     Scenario: A channel served after another one still sees only its own products
         When I browse the "Poland" channel
         Then I should be able to access product "Onion"
@@ -24,7 +24,7 @@ Feature: Channel isolation between consecutive requests
         Then I should be able to access product "Banana"
         But I should not be able to access product "Onion"
 
-    @ui
+    @no-api @ui
     Scenario: The first channel still sees its own products after the second one was served
         When I browse the "United States" channel
         Then I should be able to access product "Banana"
@@ -32,7 +32,7 @@ Feature: Channel isolation between consecutive requests
         Then I should be able to access product "Onion"
         But I should not be able to access product "Banana"
 
-    @ui
+    @no-api @ui
     Scenario: A channel returned to after the other one still sees only its own products
         When I browse the "Poland" channel
         Then I should be able to access product "Onion"

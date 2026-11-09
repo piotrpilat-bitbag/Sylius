@@ -1,4 +1,4 @@
-@frankenphp_locale @mink:frankenphp
+@worker @worker:locale @mink:workerphp
 Feature: Locale isolation between consecutive requests
     In order to read the shop in its own language
     As a Customer
@@ -17,7 +17,7 @@ Feature: Locale isolation between consecutive requests
         And that channel allows to shop using "Polish (Poland)" and "Norwegian (Norway)" locales
         And it uses the "Polish (Poland)" locale by default
 
-    @ui
+    @no-api @ui
     Scenario: A channel served after another one offers only its own locales
         When I browse the "Web" channel
         Then I should shop using the "English (United States)" locale
@@ -25,7 +25,7 @@ Feature: Locale isolation between consecutive requests
         Then I should shop using the "Polish (Poland)" locale
         And I should not be able to shop using the "English (United States)" locale
 
-    @ui
+    @no-api @ui
     Scenario: The first channel keeps its own locale after the second one was served
         When I browse the "Mobile" channel
         Then I should shop using the "Polish (Poland)" locale

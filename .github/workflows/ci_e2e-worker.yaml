@@ -1,46 +1,9 @@
 #  Request isolation in worker mode (FrankenPHP).
-#
-#  Measures one thing: whether a request sees state left behind by the previous
-#  one, when the PHP process does not die in between. Every other e2e job serves
-#  the application with a process that ends with the response, so none of them
-#  can see this at all.
-#
-#  NO MATRIX, deliberately. A carried-over field is a property of a shared
-#  service in the container, not of a PHP or Symfony version - the same services
-#  carry the same fields on every one of them. The combinatorics belong to the
-#  other e2e jobs; here they would only add time and force an entry in
-#  matrix.json. One run on a current version is enough.
-#
-#  The PHP version is one value in one place because it has to agree in two:
-#  setup-php builds the application and the FrankenPHP image serves it. When the
-#  two disagree, platform_check.php kills the application on startup.
-#
-#  What BuildTestAppAction@v4 does, read off the log of a real
-#  "Tests (MariaDB) / UI" job in Sylius/Sylius, run 41054186132:
-#
-#      sudo service mysql stop ; docker run -d <database>
-#      DATABASE_URL=… >> $GITHUB_ENV
-#      shivammathur/setup-php@v2
-#      actions/cache@v4
-#      [e2e_js] chromedriver          gated by e2e_js, NOT by e2e
-#      [e2e]    symfony server:start --port=8080 --dir=./public --daemon --no-tls
-#      doctrine:database:create / assets:install / cache:warmup
-#      sylius:fixtures:load -n
-#
-#  Two consequences for this job: port 8080 has to be freed, and the `worker`
-#  fixtures load AFTER the action, because channel B copies a catalogue that
-#  only exists once the default suite has run.
 
 name: Tests (worker mode)
 
 on:
     workflow_dispatch: ~
-    #  Temporary, while the suite is being brought up: workflow_dispatch only
-    #  works for workflows present on the default branch, and this one is not
-    #  there yet. The `upmerge/**` branch name is chosen on purpose -
-    #  ci__minimal.yaml lists it in branches-ignore and ci__full.yaml only reacts
-    #  to full-ci/**, so a push does not fire the other twenty-odd jobs.
-    #  TO BE REMOVED before the pull request.
     push:
         branches:
             - 'upmerge/worker-mode'
@@ -56,34 +19,14 @@ permissions:
     contents: read
 
 env:
-    #  The same environment as the other e2e jobs. In `dev`,
-    #  DoctrineMetadataCacheWarmer breaks cache:clear ("must load metadata
-    #  first"), and the profiler would add per-request state of its own and
-    #  drown the signal. test_cached has APP_DEBUG=0.
     APP_ENV: test_cached
     PHP_VERSION: '8.5'
     SYMFONY_VERSION: '~7.4.0'
-    #  NOTE: the PHP version is PINNED TO THE FrankenPHP RELEASE and cannot be
-    #  chosen separately. v1.13.5 ships PHP 8.5. It has to match PHP_VERSION
-    #  above, otherwise the application runs on a different version than the one
-    #  Composer resolved against. Guarded below.
     FRANKENPHP_RELEASE: 'v1.13.5'
+    FRANKENPHP_RELEASES_URL: 'https://github.com/php/frankenphp/releases/download'
     MYSQL_VERSION: '8.4'
-    #  TEMPORARY, together with the `push` trigger below: the fixes for
-    #  ResourceTranslationsType and CookieStorage live in sylius/resource-bundle,
-    #  which has not released them yet. Until it does, the branch comes from the
-    #  fork so that this suite measures the INTENDED end state rather than half
-    #  the fixes. After the release: empty this variable and the step below
-    #  skips itself.
-    #
-    #  The BRANCH TIP, deliberately: the fork is developed alongside this
-    #  suite, so a pin here would be a second place to bump on every push to
-    #  it, and a stale one would quietly measure old code. The step below
-    #  records WHICH commit a run resolved, which is what the A5 gate needs -
-    #  it compares three runs of one Sylius commit and has to be able to tell
-    #  "same red list" from "different resource-bundle". Appending
-    #  `#<commit>` here still works and is then asserted, for the length of
-    #  that gate.
+    WORKER_HOST: '127.0.0.1'
+    WORKER_PORT: '8080'
     RESOURCE_BUNDLE_REF: 'dev-feature/1.15/OP-617 as 1.15.99'
     RESOURCE_BUNDLE_REPO: 'https://github.com/piotrpilat-bitbag/SyliusResourceBundle.git'
 
@@ -104,8 +47,6 @@ jobs:
                 if: "${{ inputs.branch == '' }}"
                 uses: actions/checkout@v4
 
-            #  Without these, cache:warmup has nothing to read and fails on the
-            #  missing manifest. The other e2e jobs do exactly the same.
             -   name: "Prepare manifest.json files"
                 run: |
                     mkdir -p public/build/admin public/build/shop
@@ -115,22 +56,6 @@ jobs:
                     echo "{}" > public/build/app/admin/manifest.json
                     echo "{}" > public/build/app/shop/manifest.json
 
-            #  setup-php, inside BuildTestAppAction, installs symfony-cli as a
-            #  "tool" - and when that download fails it prints
-            #
-            #      x symfony-cli Could not setup symfony-cli
-            #
-            #  and still reports the step as SUCCESSFUL. The job then dies
-            #  roughly a minute later, inside the same action, on
-            #  `symfony server:start` with "symfony: command not found" and exit
-            #  127 - an error that points nowhere near the cause. It happened
-            #  three times in one five-minute window on 2026-11-05 (runs
-            #  41998734932 and 41998741713) and a plain re-run of the identical
-            #  commit went green, so it is a transient download, not a defect
-            #  here.
-            #
-            #  Installing the binary up front makes the job immune: setup-php
-            #  may still print its x, the binary is already on PATH by then.
             -   name: "Install Symfony CLI"
                 run: |
                     for i in 1 2 3; do
@@ -145,19 +70,6 @@ jobs:
                 uses: SyliusLabs/BuildTestAppAction@v4
                 with:
                     build_type: sylius
-                    #  NO `github.run_id` here, unlike the matrix e2e jobs. There
-                    #  it makes the cache shared between the jobs of one run and
-                    #  dropped afterwards; here the workflow has a SINGLE job, so
-                    #  the run id would make every key unique and the cache would
-                    #  never hit - every run re-downloading the whole tree from
-                    #  packagist and github, which is both slow and one more
-                    #  network call that can fail. This is Composer's DOWNLOAD
-                    #  cache, keyed by package and version; composer.lock is not
-                    #  committed, so reusing it across runs cannot pin a
-                    #  resolution.
-                    #  The hash goes LAST: `cache_restore_key` is a prefix
-                    #  match, so it has to be a prefix of `cache_key` to ever
-                    #  fall back to an older entry.
                     cache_key: ${{ runner.os }}-worker-${{ hashFiles('composer.json') }}
                     cache_restore_key: ${{ runner.os }}-worker-
                     database: mysql:${{ env.MYSQL_VERSION }}
@@ -168,43 +80,28 @@ jobs:
                     php_version: ${{ env.PHP_VERSION }}
                     symfony_version: ${{ env.SYMFONY_VERSION }}
 
-            #  Belt and braces for the step above. If symfony-cli is missing at
-            #  this point the next steps fail on a misleading `command not
-            #  found`; fail here instead, where the message names the cause.
             -   name: "Confirm Symfony CLI is present"
                 run: |
                     command -v symfony >/dev/null \
                         || { echo "::error::symfony-cli is not on PATH - setup-php reports 'Could not setup symfony-cli' and still marks its step successful"; exit 1; }
                     symfony version
 
-            #  The action started the Symfony CLI server on 8080 (--daemon). It
-            #  has to go before FrankenPHP takes the same port - otherwise Behat
-            #  hits the OLD server and the whole suite measures classic mode
-            #  while staying green.
             -   name: "Stop the Symfony CLI server"
                 run: |
-                    # BuildTestAppAction starts the server with --dir=./public,
-                    # so it has to be stopped with the same directory. With any
-                    # other `--dir`, symfony reports "The web server is not
-                    # running" and exits successfully, leaving a process that
-                    # still holds the port.
                     symfony server:stop --dir="$PWD/public" || true
                     symfony server:stop --dir="$PWD" || true
 
                     # If anything still holds 8080, kill it by PID.
                     for _ in 1 2 3; do
-                        ss -ltn | grep -q ':8080 ' || break
-                        PID=$(ss -ltnp 2>/dev/null | grep ':8080 ' | grep -oP 'pid=\K[0-9]+' | head -1)
+                        ss -ltn | grep -q ":${WORKER_PORT} " || break
+                        PID=$(ss -ltnp 2>/dev/null | grep ":${WORKER_PORT} " | grep -oP 'pid=\K[0-9]+' | head -1)
                         [ -n "$PID" ] && kill "$PID" 2>/dev/null || true
                         sleep 2
                     done
 
-                    # Guard: without a free port FrankenPHP cannot bind, Behat
-                    # reaches the OLD server and the whole suite measures classic
-                    # mode while going green.
-                    if ss -ltn | grep -q ':8080 '; then
+                    if ss -ltn | grep -q ":${WORKER_PORT} "; then
                         echo "::error::port 8080 is still taken"
-                        ss -ltnp | grep ':8080 ' || true
+                        ss -ltnp | grep ":${WORKER_PORT} " || true
                         exit 1
                     fi
 
@@ -220,30 +117,13 @@ jobs:
                     composer show sylius/resource-bundle | head -3
                     bin/console cache:clear --no-interaction
 
-            #  Two jobs in one. First, a dropped fork is silent: the suite
-            #  stays green until some scenario happens to walk into one of the
-            #  unreleased fixes, and then reports a leak that is really a
-            #  missing dependency. That is exactly what 51fe357b22 (step
-            #  deleted) followed by 496840d6ec (locale scenario added) cost -
-            #  one full red cycle.
-            #
-            #  Second, it RECORDS the commit this run resolved. Without that,
-            #  comparing three runs for the A5 gate cannot distinguish "the
-            #  suite is flaky" from "the fork moved under it".
             -   name: "Confirm the resource-bundle fork is installed"
                 if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
                 run: |
                     installed=$(composer show sylius/resource-bundle 2>&1 || true)
                     echo "$installed"
-
-                    #  `composer show` prints `source : [git] <url> <commit>`.
                     sha=$(echo "$installed" | awk '/^source/ && /\[git\]/ { print $NF }' | head -1)
 
-                    #  What to assert on. NOT the `as <version>` alias: that
-                    #  exists only while Composer resolves, and `composer show`
-                    #  prints the real one - `versions : * dev-<branch>`. So
-                    #  strip the alias, then assert the commit when the ref
-                    #  pins one and the branch when it does not.
                     ref="${RESOURCE_BUNDLE_REF%% as *}"
                     case "$ref" in
                         *'#'*)
@@ -269,20 +149,9 @@ jobs:
 
             -   name: "Fetch the FrankenPHP binary"
                 run: |
-                    #  Into RUNNER_TEMP rather than /usr/local/bin, which is
-                    #  root-owned on the runner. GITHUB_PATH carries it over to
-                    #  the following steps.
-                    #
-                    #  --retry, for the same reason symfony-cli is installed by
-                    #  hand above: a single unretried fetch from a release host
-                    #  is a single point of failure for the whole job.
-                    #  --retry-all-errors covers the connection resets, not only
-                    #  the HTTP statuses curl retries by default. A truncated
-                    #  download survives this, which is what `frankenphp version`
-                    #  below is for.
                     curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 \
                         -o "$RUNNER_TEMP/frankenphp" \
-                        "https://github.com/php/frankenphp/releases/download/${FRANKENPHP_RELEASE}/frankenphp-linux-x86_64"
+                        "${FRANKENPHP_RELEASES_URL}/${FRANKENPHP_RELEASE}/frankenphp-linux-x86_64"
                     chmod +x "$RUNNER_TEMP/frankenphp"
                     echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
                     "$RUNNER_TEMP/frankenphp" version
@@ -292,18 +161,6 @@ jobs:
                     mkdir -p var/frankenphp/php.d var/log
                     printf 'memory_limit=512M\n' > var/frankenphp/php.d/99-ci.ini
 
-                    #  ONE worker, stated explicitly as ",1". Without the count
-                    #  FrankenPHP starts several of them, consecutive requests
-                    #  land in DIFFERENT processes and carried-over state has
-                    #  nowhere to accumulate - the suite then passes green while
-                    #  measuring nothing.
-                    #
-                    #  FRANKENPHP_LOOP_MAX=-1: the worker must NOT recycle mid
-                    #  suite, because a restart wipes the trace. Recycling does
-                    #  not fix correctness bugs, it only hides the memory symptom.
-                    #
-                    #  No SERVER_NAME: the binary accepts any Host header, so the
-                    #  channel hostnames work without /etc/hosts entries.
                     PHP_INI_SCAN_DIR="$PWD/var/frankenphp/php.d" \
                     FRANKENPHP_LOOP_MAX=-1 \
                     APP_ENV="$APP_ENV" APP_DEBUG=0 \
@@ -311,111 +168,60 @@ jobs:
                     TEST_SYLIUS_USE_LEGACY_GRID_CONFIG=true \
                         setsid frankenphp php-server \
                             --root "$PWD/public" \
-                            --listen 127.0.0.1:8080 \
+                            --listen ${WORKER_HOST}:${WORKER_PORT} \
                             --worker "$PWD/public/index.php,1" \
                             < /dev/null > var/log/frankenphp.log 2>&1 &
 
                     for i in $(seq 1 30); do
-                        if curl -fsS -o /dev/null http://localhost:8080/; then
+                        if curl -fsS -o /dev/null http://${WORKER_HOST}:${WORKER_PORT}/; then
                             echo "  worker answered after ${i}s"; exit 0
                         fi
                         sleep 1
                     done
                     echo "::error::FrankenPHP did not answer 200 within 30s"
                     echo "--- response body:"
-                    curl -s http://localhost:8080/ | head -c 3000 || true
+                    curl -s http://${WORKER_HOST}:${WORKER_PORT}/ | head -c 3000 || true
                     echo "--- frankenphp log:"
                     tail -c 20000 var/log/frankenphp.log 2>/dev/null || true
                     echo "--- application log ($APP_ENV):"
                     tail -c 20000 "var/log/${APP_ENV}.log" 2>/dev/null || ls -la var/log/ || true
                     exit 1
 
-            #  A scenario that does not measure a worker passes green while
-            #  checking nothing. This step guards against that silence.
             -   name: "Confirm we are really in worker mode"
                 run: |
-                    #  X-Franken-Worker is gone: it came from the Caddyfile,
-                    #  which the binary setup does not use. Two guards instead.
-
-                    #  1. FrankenPHP is answering, not a forgotten symfony server.
-                    curl -fsSI http://localhost:8080/ | tr -d '\r' | grep -qi '^server:.*caddy' \
+                    curl -fsSI http://${WORKER_HOST}:${WORKER_PORT}/ | tr -d '\r' | grep -qi '^server:.*caddy' \
                         || { echo "::error::no Server: Caddy header - something other than FrankenPHP is answering"; exit 1; }
-
-                    #  2. The PHP the SERVER runs matches the one the vendor
-                    #     tree was resolved against. Read from X-Powered-By, not
-                    #     from `frankenphp version`: the point is what is
-                    #     actually answering on 8080, not what sits on disk.
-                    #     On a mismatch platform_check.php returns 500 on every
-                    #     request, which looks like a leak and sends the
-                    #     investigation the wrong way.
-                    SRV_PHP=$(curl -sI http://localhost:8080/ | tr -d '\r' \
+                    SRV_PHP=$(curl -sI http://${WORKER_HOST}:${WORKER_PORT}/ | tr -d '\r' \
                         | awk -F'PHP/' '/^[Xx]-[Pp]owered-[Bb]y/{print $2}')
                     test -n "$SRV_PHP" \
                         || { echo "::error::no X-Powered-By header - cannot confirm WHAT is answering"; exit 1; }
                     test "${SRV_PHP%.*}" = "$PHP_VERSION" \
                         || { echo "::error::server PHP ($SRV_PHP) != build PHP ($PHP_VERSION)"; exit 1; }
 
-                    #  Confirm the server responds. Scenarios create channels dynamically
-                    #  in Background steps, so any HTTP response (even 500 when no
-                    #  channels exist yet) confirms FrankenPHP is alive and reachable.
-                    code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ 2>/dev/null || true)
+                    code=$(curl -s -o /dev/null -w '%{http_code}' http://${WORKER_HOST}:${WORKER_PORT}/ 2>/dev/null || true)
                     test "$code" != "000" \
                         || { echo "::error::server is not responding"; exit 1; }
                     echo "  server answered with HTTP ${code}, ok"
 
-            #  A suite of its own, not an extension of @ui. Those talk to a
-            #  kernel booted inside the Behat process, and then there is no
-            #  worker left to measure.
             -   name: "Run worker-mode Behat"
                 env:
-                    SYLIUS_BEHAT_SECOND_SESSION: frankenphp_second
+                    SYLIUS_BEHAT_SECOND_SESSION: workerphp_second
                     SYLIUS_BEHAT_API_WORKER: true
-                #  Every suite runs, whatever the ones before it did, and the
-                #  step reports the WHOLE list of red ones at the end. Under the
-                #  default `set -e` the first failure killed the step, so a red
-                #  `admin` hid `api`, `checkout` and `cart` entirely - on
-                #  2026-11-05 that cost a full cycle in which the shop-API
-                #  scenarios never ran once. Eight suites, eight results, one
-                #  run.
                 shell: bash
                 run: |
-                    failed=""
+                    ui=0
+                    vendor/bin/behat --strict --no-interaction --colors \
+                        --suite-tags="@worker&&~@worker:cart" --tags="~@todo" \
+                        || ui=$?
 
-                    run_suite() {
-                        name="$1"; shift
-                        echo "::group::Behat: ${name}"
-                        if "$@"; then
-                            echo "::endgroup::"
-                        else
-                            echo "::endgroup::"
-                            echo "::error::Behat suite '${name}' failed"
-                            failed="${failed} ${name}"
-                        fi
-                    }
-
-                    #  `theme` runs FIRST on purpose. InMemoryThemeRepository loads the
-                    #  theme list once per process, lazily, on the first rendered shop
-                    #  page. Test themes only exist from a scenario's Background onwards,
-                    #  so a worker that served a shop page earlier has cached an empty
-                    #  list and never reloads it - the suite would then go red for having
-                    #  nothing to measure, not for finding a leak.
-                    for s in theme channel currency locale customer admin checkout promotion; do
-                        run_suite "$s" \
-                            vendor/bin/behat --strict --no-interaction --colors \
-                                --suite "ui_frankenphp_${s}_isolation" --tags="~@todo"
-                    done
-
-                    run_suite api \
+                    cart=0
+                    SYLIUS_BEHAT_SECOND_SESSION=panther_second PATH="$PWD/drivers:$PATH" \
                         vendor/bin/behat --strict --no-interaction --colors \
-                            --suite api_frankenphp_isolation --tags="~@todo"
+                            --suite-tags="@worker&&@worker:cart" --tags="~@todo" \
+                        || cart=$?
 
-                    run_suite cart \
-                        env PATH="$PWD/drivers:$PATH" SYLIUS_BEHAT_SECOND_SESSION=panther_second \
-                            vendor/bin/behat --strict --no-interaction --colors \
-                                --suite ui_frankenphp_cart_isolation --tags="~@todo"
-
-                    if [ -n "$failed" ]; then
-                        echo "::error::red suites:${failed}"
+                    if [ "$ui" -ne 0 ] || [ "$cart" -ne 0 ]; then
+                        echo "::error::worker-mode Behat failed (ui=$ui cart=$cart)"
                         exit 1
                     fi
                     echo "every suite passed"
@@ -426,24 +232,6 @@ jobs:
                     tail -c 50000 var/log/frankenphp.log 2>/dev/null || true
                     tail -c 50000 "var/log/${APP_ENV}.log" 2>/dev/null || ls -la var/log/ || true
 
-            #  Static counterpart to the suite above, and ADVISORY ONLY - hence
-            #  continue-on-error. Igor reads the AST and cannot tell a mutation
-            #  of an injected dependency from an ordinary method call on it, so
-            #  on a codebase this size most of what it reports is noise. Gating
-            #  the build on it would mean a permanently red job that everyone
-            #  learns to skip, taking the few real findings with it.
-            #
-            #  It earns its place anyway: Behat only sees state that a scenario
-            #  walks into, while this covers every shared service in the
-            #  compiled container, including the ones no feature file reaches.
-            #
-            #  Last on purpose. It runs even when the suite went red (the
-            #  findings are often the explanation), but after the logs, so a
-            #  failing run still opens on the failure rather than on the audit.
-            #
-            #  Uses the IgorPhpBundle (config/bundles.php, test/test_cached) to
-            #  generate the service map, so it runs in the same APP_ENV as the
-            #  rest of the job instead of building a separate prod container.
             -   name: "Igor: static audit (advisory)"
                 if: always()
                 continue-on-error: true

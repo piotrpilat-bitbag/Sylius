@@ -1,4 +1,4 @@
-@frankenphp_checkout @mink:frankenphp
+@worker @worker:checkout @mink:workerphp
 Feature: Channel isolation after a completed checkout
     In order to keep serving every channel correctly
     As a Developer
@@ -24,7 +24,7 @@ Feature: Channel isolation after a completed checkout
         And the store allows paying Offline
         And there is a user "robb@stark.com" identified by "KingInTheNorth"
 
-    @ui
+    @no-api @ui
     Scenario: The other channel still sees only its own products after an order was placed
         Given I am logged in as "robb@stark.com"
         And I added product "Banana" to the cart
@@ -42,7 +42,7 @@ Feature: Channel isolation after a completed checkout
         Then I should see "Onion" product
         But I should not see "Banana" product
 
-    @ui
+    @no-api @ui
     Scenario: The customer can view their order in account history after checkout
         Given I am logged in as "robb@stark.com"
         And I added product "Banana" to the cart
@@ -55,7 +55,7 @@ Feature: Channel isolation after a completed checkout
         When I browse my orders
         Then I should see a single order in the list
 
-    @ui
+    @no-api @ui
     Scenario: An anonymous visitor on the same channel after an order was placed does not inherit the previous order
         Given I am logged in as "robb@stark.com"
         And I added product "Banana" to the cart
@@ -71,7 +71,7 @@ Feature: Channel isolation after a completed checkout
         When I browse the "United States" channel
         Then I should see "Banana" product
 
-    @ui
+    @no-api @ui
     Scenario: Orders placed by consecutive customers do not leak between their accounts
         Given there is a user "sansa@stark.com" identified by "queenInTheNorth"
         And I am logged in as "robb@stark.com"

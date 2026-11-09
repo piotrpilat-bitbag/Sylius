@@ -1,4 +1,4 @@
-@frankenphp_admin @mink:frankenphp
+@worker @worker:admin @mink:workerphp
 Feature: Back office isolation between consecutive requests
     In order to administer the shop all day
     As an Administrator
@@ -17,7 +17,7 @@ Feature: Back office isolation between consecutive requests
         And there is an administrator "ned@stark.com" identified by "winterfell"
         And I am logged in as an administrator
 
-    @ui
+    @no-api @ui
     Scenario: Editing an administrator without a password still works after one was created
         When I want to create a new administrator
         And I specify its name as "jon"
@@ -30,7 +30,7 @@ Feature: Back office isolation between consecutive requests
         And I save my changes
         Then I should be notified that it has been successfully edited
 
-    @ui
+    @no-api @ui
     Scenario: An anonymous visitor after an administrator logged in does not inherit the back office
         When I open administration dashboard
         Then I should be logged in
@@ -39,7 +39,7 @@ Feature: Back office isolation between consecutive requests
         Then I should be on login page
         And I should not be logged in
 
-    @ui
+    @no-api @ui
     Scenario: A customer account cannot access the administration panel after an administrator was active
         When I open administration dashboard
         Then I should be logged in
@@ -54,7 +54,7 @@ Feature: Back office isolation between consecutive requests
         And I log in
         Then I should be logged in
 
-    @ui
+    @no-api @ui
     Scenario: Shop traffic on multiple channels does not break back office access
         When I open administration dashboard
         Then I should be logged in
@@ -63,7 +63,7 @@ Feature: Back office isolation between consecutive requests
         When I open administration dashboard
         Then I should be logged in
 
-    @ui
+    @no-api @ui
     Scenario: A locale added during process runtime shows up in translatable forms
         When I want to create a new translatable entity
         Then I should not be able to translate it in "Polish (Poland)"
