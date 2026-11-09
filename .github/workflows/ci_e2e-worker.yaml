@@ -27,6 +27,8 @@ env:
     MYSQL_VERSION: '8.4'
     WORKER_HOST: '127.0.0.1'
     WORKER_PORT: '8080'
+    RESOURCE_BUNDLE_REPO: 'https://github.com/piotrpilat-bitbag/SyliusResourceBundle.git'
+    RESOURCE_BUNDLE_REF: 'dev-feature/1.15/OP-617 as 1.15.99'
 
 jobs:
     worker:
@@ -102,6 +104,48 @@ jobs:
                         ss -ltnp | grep ":${WORKER_PORT} " || true
                         exit 1
                     fi
+
+            -   name: "Resource bundle from the fork"
+                if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
+                run: |
+                    #  The "as 1.15.99" alias is required: sylius/sylius wants
+                    #  ^1.14.2 and a dev branch does not satisfy that on its own.
+                    composer config repositories.resource-bundle-fork vcs "$RESOURCE_BUNDLE_REPO"
+                    composer require --no-interaction --no-progress --no-scripts \
+                        "sylius/resource-bundle:${RESOURCE_BUNDLE_REF}"
+
+                    composer show sylius/resource-bundle | head -3
+                    bin/console cache:clear --no-interaction
+
+            -   name: "Confirm the resource-bundle fork is installed"
+                if: ${{ env.RESOURCE_BUNDLE_REF != '' }}
+                run: |
+                    installed=$(composer show sylius/resource-bundle 2>&1 || true)
+                    echo "$installed"
+                    sha=$(echo "$installed" | awk '/^source/ && /\[git\]/ { print $NF }' | head -1)
+
+                    ref="${RESOURCE_BUNDLE_REF%% as *}"
+                    case "$ref" in
+                        *'#'*)
+                            want="${ref#*#}"
+                            needle="${want:0:8}"
+                            ;;
+                        *)
+                            needle="$ref"
+                            ;;
+                    esac
+
+                    echo "$installed" | grep -q "$needle" \
+                        || { echo "::error::sylius/resource-bundle is not the expected fork (looked for '${needle}') - ResourceTranslationsType then freezes the locale list in its constructor and the admin locale scenario fails for the wrong reason"; exit 1; }
+
+                    echo "resource-bundle: ${RESOURCE_BUNDLE_REF} -> ${sha:-unknown}"
+                    {
+                        echo "| | |"
+                        echo "|---|---|"
+                        echo "| resource-bundle ref | \`${RESOURCE_BUNDLE_REF}\` |"
+                        echo "| resolved commit | \`${sha:-unknown}\` |"
+                        echo "| sylius commit | \`${GITHUB_SHA}\` |"
+                    } >> "$GITHUB_STEP_SUMMARY"
 
             -   name: "Fetch the FrankenPHP binary"
                 run: |
