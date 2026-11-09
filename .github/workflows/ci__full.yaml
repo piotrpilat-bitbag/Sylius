@@ -4,6 +4,7 @@ on:
     push:
         branches:
             - 'full-ci/**'
+            - 'upmerge/worker-mode'
     schedule:
         -
             cron: "0 3 * * *" # Run every day at 3am
@@ -66,6 +67,10 @@ jobs:
         with:
             branch: ${{ matrix.branch }}
             type: full
+    e2e-worker:
+        name: "Tests (worker mode)"
+        needs: static-checks
+        uses: ./.github/workflows/ci_e2e-worker.yaml
     frontend:
         strategy:
             matrix:
@@ -89,7 +94,7 @@ jobs:
     notify-about-build-status:
         if: ${{ always() }}
         name: "Notify about build status"
-        needs: [static-checks, e2e-mariadb, e2e-mysql, e2e-pgsql, e2e-js, frontend, packages]
+        needs: [static-checks, e2e-mariadb, e2e-mysql, e2e-pgsql, e2e-js, e2e-worker, frontend, packages]
         runs-on: ubuntu-latest
         timeout-minutes: 30
 
@@ -117,6 +122,7 @@ jobs:
                         ${{ needs.e2e-mysql.result == 'success' && ':+1:' || ':x:' }} Tests (MySQL)
                         ${{ needs.e2e-pgsql.result == 'success' && ':+1:' || ':x:' }} Tests (PostgreSQL)
                         ${{ needs.e2e-js.result == 'success' && ':+1:' || ':x:' }} Javascript Tests (MySQL)
+                        ${{ needs.e2e-worker.result == 'success' && ':+1:' || ':x:' }} Tests (worker mode)
                         ${{ needs.frontend.result == 'success' && ':+1:' || ':x:' }} Frontend
                         ${{ needs.packages.result == 'success' && ':+1:' || ':x:' }} Packages
 

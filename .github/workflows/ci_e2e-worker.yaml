@@ -4,9 +4,6 @@ name: Tests (worker mode)
 
 on:
     workflow_dispatch: ~
-    push:
-        branches:
-            - 'upmerge/worker-mode'
     workflow_call:
         inputs:
             branch:
