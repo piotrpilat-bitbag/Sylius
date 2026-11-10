@@ -130,6 +130,6 @@ final class ProductsToProductAssociationsTransformer implements DataTransformerI
 
     public function reset(): void
     {
-        $this->productAssociations = null;
+        $this->productAssociations = new ArrayCollection();
     }
 }
