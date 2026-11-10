@@ -97,18 +97,27 @@ final class ProductsToProductAssociationsTransformerTest extends TestCase
         $this->assertNull($this->productsToProductAssociationsTransformer->reverseTransform(''));
     }
 
-    public function testItResetsProductAssociations(): void
+    public function testItDoesNotReuseProductAssociationsFromAPreviousRequestAfterReset(): void
     {
-        $productAssociation = $this->createMock(ProductAssociationInterface::class);
         $productAssociationType = $this->createMock(ProductAssociationTypeInterface::class);
-        $productAssociation->method('getType')->willReturn($productAssociationType);
-        $productAssociation->method('getAssociatedProducts')->willReturn(new ArrayCollection());
         $productAssociationType->method('getCode')->willReturn('accessories');
 
-        $this->productsToProductAssociationsTransformer->transform(new ArrayCollection([$productAssociation]));
+        $previousProductAssociation = $this->createMock(ProductAssociationInterface::class);
+        $previousProductAssociation->method('getType')->willReturn($productAssociationType);
+        $previousProductAssociation->method('getAssociatedProducts')->willReturn(new ArrayCollection());
+
+        $this->productsToProductAssociationsTransformer->transform(new ArrayCollection([$previousProductAssociation]));
+
         $this->productsToProductAssociationsTransformer->reset();
 
-        $reflection = new \ReflectionProperty($this->productsToProductAssociationsTransformer, 'productAssociations');
-        $this->assertNull($reflection->getValue($this->productsToProductAssociationsTransformer));
+        $product = $this->createMock(ProductInterface::class);
+        $freshProductAssociation = $this->createMock(ProductAssociationInterface::class);
+        $this->productAssociationFactory->method('createNew')->willReturn($freshProductAssociation);
+        $this->productAssociationTypeRepository->method('findOneBy')->willReturn($productAssociationType);
+        $this->productRepository->method('findBy')->willReturn([$product]);
+
+        $productAssociations = $this->productsToProductAssociationsTransformer->reverseTransform(['accessories' => 'MUG']);
+
+        $this->assertSame($freshProductAssociation, $productAssociations->first());
     }
 }

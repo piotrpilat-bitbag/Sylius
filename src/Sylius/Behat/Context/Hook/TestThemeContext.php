@@ -16,16 +16,23 @@ namespace Sylius\Behat\Context\Hook;
 use Behat\Behat\Context\Context;
 use Behat\Hook\BeforeScenario;
 use Sylius\Bundle\ThemeBundle\Configuration\Test\TestThemeConfigurationManagerInterface;
+use Sylius\Bundle\ThemeBundle\Repository\ThemeRepositoryInterface;
 
 final class TestThemeContext implements Context
 {
-    public function __construct(private TestThemeConfigurationManagerInterface $testThemeConfigurationManager)
-    {
+    public function __construct(
+        private TestThemeConfigurationManagerInterface $testThemeConfigurationManager,
+        private ThemeRepositoryInterface $themeRepository,
+    ) {
     }
 
     #[BeforeScenario]
-    public function purgeTestThemes()
+    public function purgeTestThemes(): void
     {
         $this->testThemeConfigurationManager->clear();
+
+        if (method_exists($this->themeRepository, 'reset')) {
+            $this->themeRepository->reset();
+        }
     }
 }

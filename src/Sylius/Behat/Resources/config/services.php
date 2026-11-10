@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 use Psr\Clock\ClockInterface as PsrClockInterface;
 use Sylius\Behat\Service\Accessor\NotificationAccessor;
+use Sylius\Bundle\ThemeBundle\Configuration\CompositeConfigurationProvider;
+use Sylius\Bundle\ThemeBundle\Configuration\ConfigurationProviderInterface;
+use Sylius\Bundle\ThemeBundle\Configuration\Test\TestConfigurationProvider;
+use Sylius\Bundle\ThemeBundle\Configuration\Test\TestThemeConfigurationManagerInterface;
 use Sylius\Behat\Service\Accessor\TableAccessor;
 use Sylius\Behat\Service\ApiSecurityService;
 use Sylius\Behat\Service\Checker\EmailChecker;
@@ -57,6 +61,18 @@ return static function (ContainerConfigurator $container) {
     $container->import('services/contexts.php');
     $container->import('services/elements/**/*.php');
     $container->import('services/pages.php');
+
+    $services
+        ->set('behat.theme.test_config_provider', TestConfigurationProvider::class)
+        ->args([service(TestThemeConfigurationManagerInterface::class)])
+    ;
+
+    $services
+        ->set(ConfigurationProviderInterface::class, CompositeConfigurationProvider::class)
+        ->args([[
+            service('behat.theme.test_config_provider'),
+        ]])
+    ;
 
     $parameters->set('sylius.behat.clock.date_file', '%kernel.project_dir%/var/date.txt');
     $parameters->set('sylius.behat.guest_cart_token_file', '%kernel.project_dir%/var/guest_cart_token.txt');

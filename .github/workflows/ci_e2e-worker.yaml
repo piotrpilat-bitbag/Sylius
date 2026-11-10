@@ -29,6 +29,8 @@ env:
     WORKER_PORT: '8080'
     RESOURCE_BUNDLE_REPO: 'https://github.com/piotrpilat-bitbag/SyliusResourceBundle.git'
     RESOURCE_BUNDLE_REF: 'dev-feature/1.15/OP-617 as 1.15.99'
+    THEME_BUNDLE_REPO: 'https://github.com/piotrpilat-bitbag/SyliusThemeBundle.git'
+    THEME_BUNDLE_REF: 'dev-feature/1.15/worker-mode as 2.5.99'
 
 jobs:
     worker:
@@ -145,6 +147,45 @@ jobs:
                         echo "| resource-bundle ref | \`${RESOURCE_BUNDLE_REF}\` |"
                         echo "| resolved commit | \`${sha:-unknown}\` |"
                         echo "| sylius commit | \`${GITHUB_SHA}\` |"
+                    } >> "$GITHUB_STEP_SUMMARY"
+
+            -   name: "Theme bundle from the fork"
+                if: ${{ env.THEME_BUNDLE_REF != '' }}
+                run: |
+                    #  The "as 2.5.99" alias is required: sylius/sylius wants
+                    #  ^2.5 and a dev branch does not satisfy that on its own.
+                    composer config repositories.theme-bundle-fork vcs "$THEME_BUNDLE_REPO"
+                    composer require --no-interaction --no-progress --no-scripts \
+                        "sylius/theme-bundle:${THEME_BUNDLE_REF}"
+
+                    composer show sylius/theme-bundle | head -3
+                    bin/console cache:clear --no-interaction
+
+            -   name: "Confirm the theme-bundle fork is installed"
+                if: ${{ env.THEME_BUNDLE_REF != '' }}
+                run: |
+                    installed=$(composer show sylius/theme-bundle 2>&1 || true)
+                    echo "$installed"
+                    sha=$(echo "$installed" | awk '/^source/ && /\[git\]/ { print $NF }' | head -1)
+
+                    ref="${THEME_BUNDLE_REF%% as *}"
+                    case "$ref" in
+                        *'#'*)
+                            want="${ref#*#}"
+                            needle="${want:0:8}"
+                            ;;
+                        *)
+                            needle="$ref"
+                            ;;
+                    esac
+
+                    echo "$installed" | grep -q "$needle" \
+                        || { echo "::error::sylius/theme-bundle is not the expected fork (looked for '${needle}') - InMemoryThemeRepository then has no reset() and themes leak between requests in worker mode"; exit 1; }
+
+                    echo "theme-bundle: ${THEME_BUNDLE_REF} -> ${sha:-unknown}"
+                    {
+                        echo "| theme-bundle ref | \`${THEME_BUNDLE_REF}\` |"
+                        echo "| resolved commit | \`${sha:-unknown}\` |"
                     } >> "$GITHUB_STEP_SUMMARY"
 
             -   name: "Fetch the FrankenPHP binary"

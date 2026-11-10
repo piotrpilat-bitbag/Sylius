@@ -20,6 +20,7 @@ use Sylius\Behat\Context\Hook\MailerContext;
 use Sylius\Behat\Context\Hook\SessionContext;
 use Sylius\Behat\Context\Hook\TestThemeContext;
 use Sylius\Bundle\ThemeBundle\Configuration\Test\TestThemeConfigurationManagerInterface;
+use Sylius\Bundle\ThemeBundle\Repository\ThemeRepositoryInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
@@ -48,7 +49,10 @@ return static function (ContainerConfigurator $container) {
 
     $services
         ->set('sylius.behat.context.hook.test_theme', TestThemeContext::class)
-        ->args([service(TestThemeConfigurationManagerInterface::class)])
+        ->args([
+            service(TestThemeConfigurationManagerInterface::class),
+            service(ThemeRepositoryInterface::class),
+        ])
     ;
 
     $services
