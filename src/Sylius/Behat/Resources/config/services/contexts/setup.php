@@ -51,6 +51,7 @@ use Sylius\Bundle\ThemeBundle\Configuration\Test\TestThemeConfigurationManagerIn
 use Sylius\Resource\Generator\RandomnessGeneratorInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service_closure;
 
 return static function (ContainerConfigurator $container) {
     $services = $container->services();
@@ -96,7 +97,7 @@ return static function (ContainerConfigurator $container) {
             service('sylius.behat.context.setup.checkout.shipping'),
             service('sylius.behat.context.setup.checkout.payment'),
             '%sylius.behat.guest_cart_token_file%',
-            service('security.token_storage'),
+            service_closure('security.token_storage'),
         ])
     ;
 
