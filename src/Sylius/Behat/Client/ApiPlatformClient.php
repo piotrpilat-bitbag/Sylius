@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Sylius\Behat\Client;
 
 use Sylius\Behat\Service\SharedStorageInterface;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\BrowserKit\AbstractBrowser;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request as HttpRequest;
@@ -33,6 +34,9 @@ final class ApiPlatformClient implements ApiClientInterface
         private readonly string $authorizationHeader,
         private readonly string $section,
     ) {
+        if ($client instanceof KernelBrowser) {
+            $client->disableReboot();
+        }
     }
 
     public function index(string $resource, array $queryParameters = [], bool $forgetResponse = false): Response
