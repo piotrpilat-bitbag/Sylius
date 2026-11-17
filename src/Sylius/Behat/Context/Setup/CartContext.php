@@ -57,7 +57,8 @@ final readonly class CartContext implements Context
         private ShippingContext $shippingContext,
         private PaymentContext $paymentContext,
         private string $guestCartTokenFilePath,
-        private ?TokenStorageInterface $tokenStorage = null,
+        /** @var \Closure():(TokenStorageInterface|null)|null */
+        private ?\Closure $tokenStorageProvider = null,
     ) {
     }
 
@@ -299,16 +300,17 @@ final readonly class CartContext implements Context
 
     private function runWithSecurityToken(callable $callback): void
     {
-        $previousToken = $this->tokenStorage?->getToken();
+        $tokenStorage = ($this->tokenStorageProvider)();
+        $previousToken = $tokenStorage?->getToken();
 
         if (
-            null !== $this->tokenStorage &&
+            null !== $tokenStorage &&
             $this->sharedStorage->has('user') &&
             $this->sharedStorage->get('user') instanceof ShopUserInterface
         ) {
             /** @var ShopUserInterface $user */
             $user = $this->sharedStorage->get('user');
-            $this->tokenStorage->setToken(
+            $tokenStorage->setToken(
                 new UsernamePasswordToken($user, 'api_shop', $user->getRoles()),
             );
         }
@@ -316,7 +318,7 @@ final readonly class CartContext implements Context
         try {
             $callback();
         } finally {
-            $this->tokenStorage?->setToken($previousToken);
+            $tokenStorage?->setToken($previousToken);
         }
     }
 
